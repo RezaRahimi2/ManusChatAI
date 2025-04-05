@@ -183,6 +183,14 @@ export default function AgentDetails({ onClose }: AgentDetailsProps) {
             <SelectItem value="grok-beta">Grok Beta</SelectItem>
           </>
         );
+      case "deepseek":
+        return (
+          <>
+            <SelectItem value="deepseek-chat">DeepSeek Chat</SelectItem>
+            <SelectItem value="deepseek-coder">DeepSeek Coder</SelectItem>
+            <SelectItem value="deepseek-llm-7b-chat">DeepSeek LLM 7B Chat</SelectItem>
+          </>
+        );
       case "litellm":
         return (
           <>
@@ -253,32 +261,28 @@ export default function AgentDetails({ onClose }: AgentDetailsProps) {
           
           <div className="mt-4">
             <Label className="block text-xs font-medium mb-1">LLM Model</Label>
-            <div className="flex space-x-2">
-              <Input
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="Enter model name..."
-                className="w-full bg-neutral-50 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm"
-              />
-            </div>
-            {availableModels.length > 0 && (
-              <div className="mt-1">
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Suggested models:</p>
-                <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
-                  {availableModels.map(modelName => (
-                    <button
-                      key={modelName}
-                      onClick={() => setModel(modelName)}
-                      className={`px-2 py-1 text-xs rounded-md ${
-                        model === modelName 
-                          ? 'bg-primary-500 text-white' 
-                          : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-600'
-                      }`}
-                    >
+            <Select value={model} onValueChange={setModel}>
+              <SelectTrigger className="w-full bg-neutral-50 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm">
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableModels.length > 0 ? (
+                  availableModels.map(modelName => (
+                    <SelectItem key={modelName} value={modelName}>
                       {modelName}
-                    </button>
-                  ))}
-                </div>
+                    </SelectItem>
+                  ))
+                ) : (
+                  renderModelOptions()
+                )}
+              </SelectContent>
+            </Select>
+            {availableModels.length > 0 && (
+              <div className="flex items-center mt-1">
+                <span className="material-icons text-neutral-500 text-xs mr-1">info</span>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  These models are configured in Settings → LLM Providers
+                </p>
               </div>
             )}
           </div>

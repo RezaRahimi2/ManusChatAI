@@ -90,7 +90,8 @@ export class MemStorage implements IStorage {
       { provider: 'ollama', baseUrl: 'http://localhost:11434', isEnabled: true },
       { provider: 'lmstudio', baseUrl: 'http://localhost:1234/v1', isEnabled: true },
       { provider: 'perplexity', isEnabled: false },
-      { provider: 'xai', isEnabled: false }
+      { provider: 'xai', isEnabled: false },
+      { provider: 'deepseek', isEnabled: false }
     ];
     
     for (const provider of defaultProviders) {
