@@ -62,12 +62,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/agents/:id', async (req, res) => {
     try {
       const agentId = parseInt(req.params.id);
+      console.log(`Updating agent ${agentId} with data:`, JSON.stringify(req.body));
+      
       const updatedAgent = await agentManager.updateAgent(agentId, req.body);
       
       if (!updatedAgent) {
+        console.log(`Agent ${agentId} not found for update`);
         return res.status(404).json({ error: 'Agent not found' });
       }
       
+      console.log(`Successfully updated agent ${agentId}:`, JSON.stringify(updatedAgent));
       res.json(updatedAgent);
     } catch (error) {
       console.error('Error updating agent:', error);

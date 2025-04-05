@@ -31,10 +31,12 @@ export const useSocket = () => {
         
         // Send a ping to verify connection
         try {
-          newSocket.send(JSON.stringify({
+          const pingData = {
             type: 'ping',
             timestamp: Date.now()
-          }));
+          };
+          console.log('Sending WebSocket ping:', pingData);
+          newSocket.send(JSON.stringify(pingData));
         } catch (err) {
           console.error('Failed to send ping:', err);
         }

@@ -18,14 +18,14 @@ export default function Workspace({ workspaceId }: WorkspaceProps) {
   const [thinking, setThinking] = useState(false);
   
   // Fetch messages for this workspace
-  const { data: messages = [], isLoading, refetch } = useQuery({
+  const { data: messages = [], isLoading, refetch } = useQuery<Message[]>({
     queryKey: ['/api/messages', workspaceId],
     queryFn: async () => {
       const response = await fetch(`/api/messages?workspaceId=${workspaceId}`);
       if (!response.ok) {
         throw new Error('Failed to fetch messages');
       }
-      return response.json();
+      return response.json() as Promise<Message[]>;
     }
   });
   
@@ -66,17 +66,27 @@ export default function Workspace({ workspaceId }: WorkspaceProps) {
     console.log('Joining workspace:', workspaceId);
     
     const handleMessage = (event: MessageEvent) => {
-      const data = JSON.parse(event.data);
-      console.log('Workspace received message:', data);
-      
-      if (data.type === 'thinking') {
-        setThinking(data.thinking);
-      } else if (data.type === 'message' && data.workspaceId === workspaceId) {
-        // Refetch messages to get the latest
-        refetch();
-        setThinking(false);
-      } else if (data.type === 'joined_workspace') {
-        console.log('Successfully joined workspace:', data.workspaceId);
+      try {
+        const data = JSON.parse(event.data);
+        console.log('Workspace received message:', data);
+        
+        if (data.type === 'thinking') {
+          console.log('Setting thinking state to:', data.thinking);
+          setThinking(data.thinking);
+        } else if (data.type === 'message' && data.workspaceId === workspaceId) {
+          console.log('Received new message for workspace, refetching messages');
+          // Refetch messages to get the latest
+          refetch();
+          setThinking(false);
+        } else if (data.type === 'joined_workspace') {
+          console.log('Successfully joined workspace:', data.workspaceId);
+        } else if (data.type === 'error') {
+          console.error('Received error from server:', data.error);
+        } else {
+          console.log('Unhandled message type:', data.type);
+        }
+      } catch (error) {
+        console.error('Error handling WebSocket message:', error);
       }
     };
     
@@ -133,10 +143,10 @@ export default function Workspace({ workspaceId }: WorkspaceProps) {
             </div>
           </div>
         ) : (
-          messages.map((message) => (
+          messages.map((message: Message) => (
             <ChatMessage 
               key={message.id} 
-              message={message as any} 
+              message={message} 
               agent={message.agentId ? getAgentById(message.agentId) : undefined}
             />
           ))

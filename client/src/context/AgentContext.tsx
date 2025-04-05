@@ -96,6 +96,8 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateAgent = async (agentData: Agent) => {
     setLoading(true);
     try {
+      console.log(`Updating agent ${agentData.id} with data:`, agentData);
+      
       const response = await fetch(`/api/agents/${agentData.id}`, {
         method: 'PUT',
         headers: {
@@ -104,11 +106,16 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         body: JSON.stringify(agentData)
       });
 
+      const responseText = await response.text();
+      console.log(`Server response (${response.status}):`, responseText);
+      
       if (!response.ok) {
-        throw new Error('Failed to update agent');
+        throw new Error(`Failed to update agent: ${response.status} ${response.statusText}`);
       }
 
-      const updatedAgent = await response.json();
+      const updatedAgent = JSON.parse(responseText);
+      console.log('Successfully parsed updated agent:', updatedAgent);
+      
       setAgents(prev => prev.map(agent => 
         agent.id === updatedAgent.id ? updatedAgent : agent
       ));
@@ -119,13 +126,15 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       toast({
         title: "Success",
-        description: "Agent updated successfully"
+        description: `Agent "${updatedAgent.name}" updated successfully`
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      console.error('Error updating agent:', errorMessage);
+      setError(errorMessage);
       toast({
         title: "Error",
-        description: "Failed to update agent",
+        description: `Failed to update agent: ${errorMessage}`,
         variant: "destructive"
       });
     } finally {
