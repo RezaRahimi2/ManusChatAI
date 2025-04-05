@@ -83,7 +83,14 @@ export default function AgentDetails({ onClose }: AgentDetailsProps) {
   if (!selectedAgent) return null;
 
   // When provider changes, update model options
-  const provider = selectedAgent.provider;
+  const [provider, setProvider] = useState(selectedAgent?.provider || "openai");
+
+  useEffect(() => {
+    // When selected agent changes, update the provider state
+    if (selectedAgent) {
+      setProvider(selectedAgent.provider);
+    }
+  }, [selectedAgent]);
 
   const handleToolToggle = (toolId: string) => {
     setSelectedTools(prev => 
@@ -93,10 +100,43 @@ export default function AgentDetails({ onClose }: AgentDetailsProps) {
     );
   };
 
+  const handleProviderChange = (value: string) => {
+    setProvider(value);
+    
+    // Set default model for the provider
+    switch (value) {
+      case "openai":
+        setModel("gpt-4o");
+        break;
+      case "anthropic":
+        setModel("claude-3-7-sonnet-20250219");
+        break;
+      case "ollama":
+        setModel("llama3");
+        break;
+      case "lmstudio":
+        setModel("local-model");
+        break;
+      case "perplexity":
+        setModel("llama-3.1-sonar-small-128k-online");
+        break;
+      case "xai":
+        setModel("grok-2-1212");
+        break;
+      case "deepseek":
+        setModel("deepseek-chat");
+        break;
+      case "litellm":
+        setModel("gpt-4o");
+        break;
+    }
+  };
+
   const handleSave = async () => {
     if (selectedAgent) {
       await updateAgent({
         ...selectedAgent,
+        provider,
         model,
         systemPrompt,
         temperature,
@@ -257,6 +297,51 @@ export default function AgentDetails({ onClose }: AgentDetailsProps) {
               <h3 className="font-medium">{selectedAgent.name}</h3>
               <p className="text-xs text-neutral-500 dark:text-neutral-400">{selectedAgent.description}</p>
             </div>
+          </div>
+          
+          <div className="mt-4">
+            <Label className="block text-xs font-medium mb-1">LLM Provider</Label>
+            <Select value={provider} onValueChange={handleProviderChange}>
+              <SelectTrigger className="w-full bg-neutral-50 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm">
+                <SelectValue placeholder="Select provider" />
+              </SelectTrigger>
+              <SelectContent>
+                {/* Top tier cloud providers */}
+                <SelectItem value="openai">OpenAI</SelectItem>
+                <SelectItem value="anthropic">Anthropic</SelectItem>
+                <SelectItem value="perplexity">Perplexity AI</SelectItem>
+                <SelectItem value="xai">xAI (Grok)</SelectItem>
+                <SelectItem value="deepseek">DeepSeek AI</SelectItem>
+                
+                {/* Local providers */}
+                <SelectItem value="ollama">Ollama (Local)</SelectItem>
+                <SelectItem value="lmstudio">LM Studio (Local)</SelectItem>
+                
+                {/* LiteLLM proxy */}
+                <SelectItem value="litellm">LiteLLM</SelectItem>
+                
+                {/* Custom LiteLLM providers - configured in settings */}
+                {Object.values(providerSettings)
+                  .filter(p => p.provider.startsWith('litellm-'))
+                  .map(p => (
+                    <SelectItem key={p.provider} value={p.provider}>
+                      {p.provider.replace('litellm-', '')} (LiteLLM)
+                    </SelectItem>
+                  ))
+                }
+                
+                {/* Custom OpenAI-compatible providers - configured in settings */}
+                {Object.values(providerSettings)
+                  .filter(p => !['openai', 'anthropic', 'ollama', 'lmstudio', 'perplexity', 'xai', 'deepseek', 'litellm'].includes(p.provider) && 
+                              !p.provider.startsWith('litellm-'))
+                  .map(p => (
+                    <SelectItem key={p.provider} value={p.provider}>
+                      {p.provider.charAt(0).toUpperCase() + p.provider.slice(1)} (Custom)
+                    </SelectItem>
+                  ))
+                }
+              </SelectContent>
+            </Select>
           </div>
           
           <div className="mt-4">

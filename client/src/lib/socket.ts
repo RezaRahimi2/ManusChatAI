@@ -19,6 +19,7 @@ export const useSocket = () => {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const wsUrl = `${protocol}//${window.location.host}/ws`;
       
+      console.log('Connecting to WebSocket at:', wsUrl);
       const newSocket = new WebSocket(wsUrl);
       
       newSocket.onopen = () => {
@@ -27,6 +28,25 @@ export const useSocket = () => {
         setWs(newSocket);
         isConnecting = false;
         reconnectAttempts = 0;
+        
+        // Send a ping to verify connection
+        try {
+          newSocket.send(JSON.stringify({
+            type: 'ping',
+            timestamp: Date.now()
+          }));
+        } catch (err) {
+          console.error('Failed to send ping:', err);
+        }
+      };
+      
+      newSocket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('WebSocket message received:', data);
+        } catch (err) {
+          console.error('Failed to parse WebSocket message:', err);
+        }
       };
       
       newSocket.onclose = (event) => {

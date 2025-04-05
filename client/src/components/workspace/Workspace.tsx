@@ -5,6 +5,7 @@ import ChatMessage from "@/components/chat/ChatMessage";
 import ThinkingMessage from "@/components/chat/ThinkingMessage";
 import { useSocket } from "@/lib/socket";
 import { useAgentContext } from "@/context/AgentContext";
+import { Message } from "@shared/schema";
 
 interface WorkspaceProps {
   workspaceId: number;
@@ -52,12 +53,21 @@ export default function Workspace({ workspaceId }: WorkspaceProps) {
     setThinking(true);
   };
   
-  // Listen for new messages from socket
+  // Listen for new messages from socket and join workspace
   useEffect(() => {
     if (!socket) return;
     
+    // Join the workspace when socket connects
+    socket.send(JSON.stringify({
+      type: 'join_workspace',
+      workspaceId
+    }));
+    
+    console.log('Joining workspace:', workspaceId);
+    
     const handleMessage = (event: MessageEvent) => {
       const data = JSON.parse(event.data);
+      console.log('Workspace received message:', data);
       
       if (data.type === 'thinking') {
         setThinking(data.thinking);
@@ -65,12 +75,21 @@ export default function Workspace({ workspaceId }: WorkspaceProps) {
         // Refetch messages to get the latest
         refetch();
         setThinking(false);
+      } else if (data.type === 'joined_workspace') {
+        console.log('Successfully joined workspace:', data.workspaceId);
       }
     };
     
     socket.addEventListener('message', handleMessage);
     
     return () => {
+      // Leave the workspace when unmounting
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({
+          type: 'leave_workspace',
+          workspaceId
+        }));
+      }
       socket.removeEventListener('message', handleMessage);
     };
   }, [socket, workspaceId, refetch]);
@@ -117,7 +136,7 @@ export default function Workspace({ workspaceId }: WorkspaceProps) {
           messages.map((message) => (
             <ChatMessage 
               key={message.id} 
-              message={message} 
+              message={message as any} 
               agent={message.agentId ? getAgentById(message.agentId) : undefined}
             />
           ))
