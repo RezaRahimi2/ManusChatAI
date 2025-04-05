@@ -28,6 +28,7 @@ export interface IStorage {
   getMessageById(id: number): Promise<Message | undefined>;
   getMessagesByWorkspace(workspaceId: number): Promise<Message[]>;
   createMessage(message: Omit<Message, 'id'>): Promise<Message>;
+  updateMessage(id: number, message: Message): Promise<Message | undefined>;
   deleteMessage(id: number): Promise<void>;
   
   // Tool methods
@@ -199,6 +200,14 @@ export class MemStorage implements IStorage {
     const newMessage: Message = { ...message, id };
     this.messages.set(id, newMessage);
     return newMessage;
+  }
+  
+  async updateMessage(id: number, message: Message): Promise<Message | undefined> {
+    const existingMessage = this.messages.get(id);
+    if (!existingMessage) return undefined;
+    
+    this.messages.set(id, message);
+    return message;
   }
   
   async deleteMessage(id: number): Promise<void> {

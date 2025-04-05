@@ -2,6 +2,7 @@ import { Agent, InsertAgent } from '@shared/schema';
 import { storage } from '../storage';
 import { BaseAgent } from './baseAgent';
 import { Orchestrator } from './orchestrator';
+import { EnhancedOrchestrator } from './enhancedOrchestrator';
 import { ResearchAgent } from './researchAgent';
 import { CodeAgent } from './codeAgent';
 import { WriterAgent } from './writerAgent';
@@ -36,10 +37,24 @@ class AgentManager {
   }
   
   async createDefaultAgents() {
-    // Create orchestrator
+    // Create enhanced orchestrator
     await this.createAgent({
-      name: 'Orchestrator',
-      description: 'Main coordination agent',
+      name: 'Enhanced Orchestrator',
+      description: 'Advanced coordination agent with sophisticated collaboration protocols',
+      type: 'enhanced_orchestrator',
+      systemPrompt: 'You are the Enhanced Orchestrator, an advanced coordination agent that uses sophisticated collaboration protocols to orchestrate specialized agents. You can dynamically determine the optimal collaboration mode (sequential, parallel, debate, or critique) based on the task requirements, and coordinate agents to work together efficiently, sharing context and building on each other\'s outputs.',
+      model: 'gpt-4',
+      provider: 'openai',
+      temperature: 0.7,
+      maxTokens: 4000,
+      tools: ['web_browser'],
+      isActive: true
+    });
+    
+    // Create basic orchestrator (as a backup option)
+    await this.createAgent({
+      name: 'Basic Orchestrator',
+      description: 'Simple coordination agent',
       type: 'orchestrator',
       systemPrompt: 'You are the Orchestrator, a coordination agent responsible for delegating tasks to specialized agents. You analyze user requests, break them down into subtasks, and determine which agents should handle each part. After receiving responses from all agents, you synthesize their outputs into a coherent response for the user.',
       model: 'gpt-4',
@@ -47,7 +62,7 @@ class AgentManager {
       temperature: 0.7,
       maxTokens: 4000,
       tools: ['web_browser'],
-      isActive: true
+      isActive: false
     });
     
     // Create research agent
@@ -98,6 +113,14 @@ class AgentManager {
     
     // Create appropriate agent type
     switch (agentData.type) {
+      case 'enhanced_orchestrator':
+        agent = new EnhancedOrchestrator(
+          agentData,
+          this.llmManager,
+          memoryManager,
+          toolManager
+        );
+        break;
       case 'orchestrator':
         agent = new Orchestrator(
           agentData,
@@ -197,21 +220,34 @@ class AgentManager {
   }
   
   async processMessage(workspaceId: number, message: string): Promise<void> {
-    // Find orchestrator agent
+    // First try to find an enhanced orchestrator
     let orchestrator: BaseAgent | undefined;
+    let fallbackOrchestrator: BaseAgent | undefined;
     
-    for (const agent of this.agents.values()) {
-      if (agent.getType() === 'orchestrator') {
+    // Convert values iterator to array to avoid TS downlevelIteration issues
+    const agentInstances = Array.from(this.agents.values());
+    
+    // First find the enhanced orchestrator if available
+    for (const agent of agentInstances) {
+      if (agent.getType() === 'enhanced_orchestrator' && agent.getConfig().isActive) {
         orchestrator = agent;
         break;
+      } else if (agent.getType() === 'orchestrator' && agent.getConfig().isActive) {
+        // Keep as fallback
+        fallbackOrchestrator = agent;
       }
     }
     
-    if (!orchestrator) {
-      throw new Error('Orchestrator agent not found');
+    // If no enhanced orchestrator, use the fallback
+    if (!orchestrator && fallbackOrchestrator) {
+      orchestrator = fallbackOrchestrator;
     }
     
-    // Process message through orchestrator
+    if (!orchestrator) {
+      throw new Error('No active orchestrator agent found');
+    }
+    
+    // Process message through the selected orchestrator
     await orchestrator.process(workspaceId, message);
   }
 }

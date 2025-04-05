@@ -50,7 +50,40 @@ export class BaseAgent {
     // Get relevant vector memories if needed
     // Add vector memories to context if similarity is high enough
     
-    return shortTermMemory;
+    // Get any additional context from deep research, stored as system messages
+    const deepResearchContext: Message[] = [];
+    const lastUserMessage = [...shortTermMemory].reverse().find(msg => msg.role === 'user');
+    
+    if (lastUserMessage) {
+      const deepResearch = this.toolManager.getToolByType('deep_research');
+      if (deepResearch) {
+        try {
+          const researchContext = await deepResearch.execute({
+            action: 'retrieve_context',
+            query: lastUserMessage.content,
+            workspaceId: workspaceId,
+            topK: 3  // Limit to avoid context overflow
+          });
+          
+          if (researchContext && typeof researchContext === 'string' && researchContext.trim().length > 0) {
+            deepResearchContext.push({
+              id: Date.now() + 1,
+              workspaceId,
+              role: 'system',
+              content: `Relevant historical context:\n${researchContext}`,
+              createdAt: Date.now(),
+              agentId: null,
+              metadata: { source: 'deep_research' }
+            });
+          }
+        } catch (error) {
+          console.error('Error retrieving deep research context:', error);
+        }
+      }
+    }
+    
+    // Combine short-term memory with deep research context
+    return [...shortTermMemory, ...deepResearchContext];
   }
   
   protected async saveToMemory(workspaceId: number, message: Message): Promise<void> {
@@ -60,6 +93,27 @@ export class BaseAgent {
     // Save to vector memory if needed
     if (message.role !== 'system') {
       await this.memoryManager.addToVectorMemory(workspaceId, message);
+    }
+    
+    // If the deep research tool is available, save the message there as well
+    const deepResearch = this.toolManager.getToolByType('deep_research');
+    if (deepResearch && message.content.trim().length > 0) {
+      try {
+        await deepResearch.execute({
+          action: 'store',
+          query: message.content,
+          metadata: {
+            type: message.role === 'user' ? 'user_query' : 'agent_response',
+            workspaceId: workspaceId,
+            agentId: message.agentId || null,
+            messageId: message.id,
+            timestamp: message.createdAt
+          },
+          collection: 'agent_interactions'
+        });
+      } catch (error) {
+        console.error('Error storing message in deep research:', error);
+      }
     }
   }
   
@@ -94,8 +148,8 @@ export class BaseAgent {
         provider: this.agentData.provider,
         model: this.agentData.model,
         messages,
-        temperature: this.agentData.temperature / 100,
-        maxTokens: this.agentData.maxTokens,
+        temperature: this.agentData.temperature ? this.agentData.temperature / 100 : 0.7,
+        maxTokens: this.agentData.maxTokens || undefined,
         tools: tools.length > 0 ? tools : undefined
       });
     } finally {
@@ -117,7 +171,8 @@ export class BaseAgent {
       role: 'assistant',
       content: responseContent,
       agentId: this.getId(),
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      metadata: {}
     };
     
     await storage.createMessage(responseMessage);
@@ -141,7 +196,9 @@ export class BaseAgent {
         workspaceId,
         role: 'user',
         content: userMessage,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        agentId: null,
+        metadata: {}
       };
       
       await storage.createMessage(message);
@@ -158,7 +215,9 @@ export class BaseAgent {
         workspaceId,
         role: 'system',
         content: `Error: ${error instanceof Error ? error.message : 'An unknown error occurred'}`,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        agentId: null,
+        metadata: { error: true }
       };
       
       await storage.createMessage(errorMessage);

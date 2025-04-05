@@ -19,6 +19,8 @@ export class ResearchAgent extends BaseAgent {
     if (!this.agentData.systemPrompt) {
       return `You are the Research Agent, specialized in finding, analyzing, and summarizing information. 
 You have access to web search and can browse web pages to extract relevant information.
+You also have access to a local deep research tool that allows you to retrieve contextually relevant information from past agent interactions and stored documents.
+
 Provide comprehensive, accurate, and properly cited information. 
 When providing research:
 1. Be thorough and detailed
@@ -26,17 +28,48 @@ When providing research:
 3. Structure information logically
 4. Highlight key findings
 5. Maintain objectivity
-6. Address uncertainties and limitations`;
+6. Address uncertainties and limitations
+7. Draw upon relevant past conversations and context stored in the research database`;
     }
     
     return this.agentData.systemPrompt;
   }
   
   async generateResponse(workspaceId: number, userMessage: string): Promise<string> {
+    let enhancedUserMessage = userMessage;
+    let hasEnhancements = false;
+    
+    // Get relevant context from the local deep research tool
+    const deepResearch = this.toolManager.getToolByType('deep_research');
+    if (deepResearch) {
+      try {
+        // Retrieve relevant context from past interactions using the deep research tool
+        const researchContext = await deepResearch.execute({
+          action: 'retrieve_context',
+          query: userMessage,
+          workspaceId: workspaceId,
+          topK: 5
+        });
+        
+        if (researchContext && researchContext.length > 0) {
+          enhancedUserMessage = `
+Original request: ${userMessage}
+
+Relevant context from past interactions:
+${researchContext}
+
+Based on this context and your knowledge, please provide a comprehensive response.`;
+          hasEnhancements = true;
+        }
+      } catch (error) {
+        console.error('Error using deep research tool:', error);
+      }
+    }
+    
     // Check if the research task requires web search
     if (this.shouldUseWebSearch(userMessage)) {
       // Get web browser tool
-      const webBrowser = await this.toolManager.getToolByType('web_browser');
+      const webBrowser = this.toolManager.getToolByType('web_browser');
       
       if (webBrowser) {
         try {
@@ -49,25 +82,66 @@ When providing research:
             query: searchQueries.join(' OR ')
           });
           
-          // Enhanced prompt with search results
-          const enhancedUserMessage = `
+          // Add web search results to the enhanced message
+          enhancedUserMessage = hasEnhancements 
+            ? `${enhancedUserMessage}\n\nWeb search results:\n${JSON.stringify(searchResults, null, 2)}`
+            : `
 Original request: ${userMessage}
 
-Search results:
+Web search results:
 ${JSON.stringify(searchResults, null, 2)}
 
 Based on these search results and your knowledge, please provide a comprehensive research response.`;
           
-          // Generate response with enhanced message
-          return super.generateResponse(workspaceId, enhancedUserMessage);
+          hasEnhancements = true;
         } catch (error) {
           console.error('Error using web browser tool:', error);
         }
       }
     }
     
-    // Fallback to standard response
-    return super.generateResponse(workspaceId, userMessage);
+    // Store the user message in the deep research database for future reference
+    if (deepResearch) {
+      try {
+        await deepResearch.execute({
+          action: 'store',
+          query: userMessage,
+          metadata: {
+            type: 'user_query',
+            workspaceId: workspaceId,
+            agentId: this.getId(),
+            timestamp: Date.now()
+          },
+          collection: 'agent_interactions'
+        });
+      } catch (error) {
+        console.error('Error storing user message in deep research:', error);
+      }
+    }
+    
+    // Generate response with enhanced message or fall back to standard
+    const response = await super.generateResponse(workspaceId, enhancedUserMessage);
+    
+    // Store the response in the deep research database for future reference
+    if (deepResearch) {
+      try {
+        await deepResearch.execute({
+          action: 'store',
+          query: response,
+          metadata: {
+            type: 'agent_response',
+            workspaceId: workspaceId,
+            agentId: this.getId(),
+            timestamp: Date.now()
+          },
+          collection: 'agent_interactions'
+        });
+      } catch (error) {
+        console.error('Error storing response in deep research:', error);
+      }
+    }
+    
+    return response;
   }
   
   private shouldUseWebSearch(userMessage: string): boolean {

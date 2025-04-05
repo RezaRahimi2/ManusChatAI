@@ -4,6 +4,7 @@ import { WebBrowser } from './webBrowser';
 import { FileSystem } from './fileSystem';
 import { CodeExecution } from './codeExecution';
 import { ApiConnector } from './apiConnector';
+import { LocalDeepResearchTool } from './localDeepResearch';
 
 // Interface for tool implementation
 export interface ITool {
@@ -87,6 +88,17 @@ export class ToolManager {
           allowedDomains: ['api.openai.com', 'api.github.com'],
           timeout: 10000
         }
+      },
+      {
+        name: 'Local Deep Research',
+        description: 'Semantic search and document storage for advanced research capabilities',
+        type: 'deep_research',
+        isEnabled: true,
+        config: {
+          baseUrl: 'http://localhost:5000',
+          defaultCollection: 'agent_interactions',
+          topK: 5
+        }
       }
     ];
     
@@ -111,6 +123,9 @@ export class ToolManager {
         break;
       case 'api_connector':
         tool = new ApiConnector(toolData);
+        break;
+      case 'deep_research':
+        tool = new LocalDeepResearchTool(toolData);
         break;
       default:
         throw new Error(`Unknown tool type: ${toolData.type}`);
