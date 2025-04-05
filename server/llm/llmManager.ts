@@ -104,6 +104,11 @@ export class LLMManager {
       case 'xai':
         return this.generateXAI(model, messages, temperature, maxTokens);
       default:
+        // Check if this is a custom provider
+        if (this.baseUrls[provider] && this.apiKeys[provider]) {
+          // Assume custom providers are OpenAI-compatible
+          return this.generateCustomOpenAICompatible(provider, model, messages, temperature, maxTokens, tools);
+        }
         throw new Error(`Unsupported LLM provider: ${provider}`);
     }
   }
@@ -425,6 +430,59 @@ export class LLMManager {
         console.error('Response data:', error.response.data);
       }
       throw new Error(`xAI API Error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async generateCustomOpenAICompatible(
+    provider: string,
+    model: string,
+    messages: LLMMessage[],
+    temperature: number,
+    maxTokens: number,
+    tools?: LLMTool[]
+  ): Promise<LLMResponse> {
+    try {
+      if (!this.apiKeys[provider]) {
+        throw new Error(`API key for ${provider} is required but not set`);
+      }
+      
+      if (!this.baseUrls[provider]) {
+        throw new Error(`Base URL for ${provider} is required but not set`);
+      }
+
+      // Set default model if not specified
+      const actualModel = model || 'default-model';
+      
+      const payload: any = {
+        model: actualModel,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+      };
+
+      if (tools && tools.length > 0) {
+        payload.tools = tools;
+        payload.tool_choice = 'auto';
+      }
+
+      const response = await axios.post(
+        `${this.baseUrls[provider]}/chat/completions`,
+        payload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKeys[provider]}`,
+          },
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error(`${provider} API Error:`, error);
+      if (axios.isAxiosError(error) && error.response) {
+        console.error('Response data:', error.response.data);
+      }
+      throw new Error(`${provider} API Error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }

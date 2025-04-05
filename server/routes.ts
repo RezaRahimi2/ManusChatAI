@@ -225,9 +225,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use the imported LLM manager
       const llmManager = new LLMManager();
       
+      // Get provider settings to determine default model
+      const providerSettings = await storage.getLLMProviderSettings(provider);
+      let defaultModel = 'default-model';
+      
+      // Set appropriate default model based on provider
+      if (provider === 'openai') {
+        defaultModel = 'gpt-4o';
+      } else if (provider === 'anthropic') {
+        defaultModel = 'claude-3-7-sonnet-20250219';
+      } else if (provider === 'ollama') {
+        defaultModel = 'llama3';
+      } else if (provider === 'lmstudio') {
+        defaultModel = 'local-model';
+      } else if (provider === 'perplexity') {
+        defaultModel = 'llama-3.1-sonar-small-128k-online';
+      } else if (provider === 'xai') {
+        defaultModel = 'grok-2-1212';
+      } else if (providerSettings && providerSettings.models && providerSettings.models.length > 0) {
+        // For custom providers, use the first model in their list if available
+        defaultModel = providerSettings.models[0];
+      }
+      
       const response = await llmManager.generateResponse({
         provider,
-        model: model || 'gpt-4o', // Default model if none provided
+        model: model || defaultModel,
         messages: testMessages,
         maxTokens: 50
       });

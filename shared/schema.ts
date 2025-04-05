@@ -4,7 +4,7 @@ import { z } from "zod";
 
 // LLM Provider Settings
 export const llmProviderSettingsSchema = z.object({
-  provider: z.enum(['openai', 'anthropic', 'ollama', 'lmstudio', 'perplexity', 'xai']),
+  provider: z.string(), // Allow any string for custom providers
   apiKey: z.string().optional(),
   baseUrl: z.string().optional(),
   models: z.array(z.string()).optional(),

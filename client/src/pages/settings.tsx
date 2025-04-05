@@ -19,11 +19,20 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -94,7 +103,7 @@ export default function Settings() {
     testConnectionMutation.mutate({ provider, model });
   };
 
-  const getDefaultFormState = (provider: "openai" | "anthropic" | "ollama" | "lmstudio" | "perplexity" | "xai"): LLMProviderSettings => {
+  const getDefaultFormState = (provider: string): LLMProviderSettings => {
     return {
       provider,
       apiKey: '',
@@ -103,6 +112,14 @@ export default function Settings() {
       isEnabled: true,
     };
   };
+
+  // Add custom provider state
+  const [isAddingProvider, setIsAddingProvider] = useState(false);
+  const [customProvider, setCustomProvider] = useState({
+    name: '',
+    baseUrl: 'https://',
+    requiresKey: true,
+  });
 
   return (
     <div className="font-sans bg-neutral-50 text-neutral-900 dark:bg-neutral-900 dark:text-neutral-50 h-screen flex flex-col">
@@ -242,6 +259,103 @@ export default function Settings() {
                       description="Configure LM Studio local settings"
                       requiresKey={false}
                     />
+                    
+                    {/* Custom providers */}
+                    {providers
+                      .filter(p => !["openai", "anthropic", "ollama", "lmstudio", "perplexity", "xai"].includes(p.provider))
+                      .map(provider => (
+                        <ProviderSettingsCard
+                          key={provider.provider}
+                          initialData={provider}
+                          onUpdate={handleProviderUpdate}
+                          onTestConnection={testConnection}
+                          defaultModels={[]}
+                          defaultUrl={provider.baseUrl || ''}
+                          testingConnection={testConnectionMutation.isPending}
+                          title={`${provider.provider} (Custom)`}
+                          description="OpenAI-compatible API"
+                          requiresKey={true}
+                        />
+                      ))}
+                      
+                    {/* Add custom provider button */}
+                    <Card className="border-dashed border-2 hover:bg-accent/50 transition-colors">
+                      <CardContent className="flex items-center justify-center p-8">
+                        <Dialog open={isAddingProvider} onOpenChange={setIsAddingProvider}>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" className="gap-2">
+                              <Plus size={16} />
+                              Add Custom OpenAI-Compatible Provider
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Add Custom Provider</DialogTitle>
+                              <DialogDescription>
+                                Add a custom OpenAI-compatible LLM provider
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="provider-name">Provider Name</Label>
+                                <Input
+                                  id="provider-name"
+                                  placeholder="e.g., Together AI, Groq, etc."
+                                  value={customProvider.name}
+                                  onChange={(e) => setCustomProvider(prev => ({ ...prev, name: e.target.value }))}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="provider-url">Base URL</Label>
+                                <Input
+                                  id="provider-url"
+                                  placeholder="e.g., https://api.together.xyz/v1"
+                                  value={customProvider.baseUrl}
+                                  onChange={(e) => setCustomProvider(prev => ({ ...prev, baseUrl: e.target.value }))}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                  Should end with /v1 for OpenAI-compatible endpoints
+                                </p>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Switch
+                                  id="provider-requires-key"
+                                  checked={customProvider.requiresKey}
+                                  onCheckedChange={(checked) => setCustomProvider(prev => ({ ...prev, requiresKey: checked }))}
+                                />
+                                <Label htmlFor="provider-requires-key">Requires API Key</Label>
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button
+                                onClick={() => {
+                                  if (!customProvider.name.trim()) {
+                                    return;
+                                  }
+                                  
+                                  const providerName = customProvider.name.trim().toLowerCase().replace(/\s+/g, '-');
+                                  
+                                  const newProvider = getDefaultFormState(providerName);
+                                  newProvider.baseUrl = customProvider.baseUrl;
+                                  newProvider.models = ["default-model"];
+                                  
+                                  handleProviderUpdate(newProvider);
+                                  setIsAddingProvider(false);
+                                  setCustomProvider({
+                                    name: '',
+                                    baseUrl: 'https://',
+                                    requiresKey: true,
+                                  });
+                                }}
+                                disabled={!customProvider.name.trim()}
+                              >
+                                Add Provider
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      </CardContent>
+                    </Card>
                   </>
                 )}
               </div>
