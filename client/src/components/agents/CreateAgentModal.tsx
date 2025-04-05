@@ -98,7 +98,39 @@ export default function CreateAgentModal({ onClose }: CreateAgentModalProps) {
         setAvailableModels(providerSetting.models);
         setModel(providerSetting.models[0]);
       } else {
-        setAvailableModels([]);
+        // For built-in providers without configured models, set default models
+        switch (provider) {
+          case "openai":
+            setAvailableModels(["gpt-4o", "gpt-4", "gpt-3.5-turbo"]);
+            setModel("gpt-4o");
+            break;
+          case "anthropic":
+            setAvailableModels(["claude-3-7-sonnet-20250219", "claude-3-opus-20240229", "claude-3-haiku-20240307"]);
+            setModel("claude-3-7-sonnet-20250219");
+            break;
+          case "ollama":
+            setAvailableModels(["llama3", "mistral", "codellama"]);
+            setModel("llama3");
+            break;
+          case "lmstudio":
+            setAvailableModels(["local-model"]);
+            setModel("local-model");
+            break;
+          case "perplexity":
+            setAvailableModels(["llama-3.1-sonar-small-128k-online", "llama-3.1-sonar-large-128k-online"]);
+            setModel("llama-3.1-sonar-small-128k-online");
+            break;
+          case "xai":
+            setAvailableModels(["grok-2-1212", "grok-vision-beta"]);
+            setModel("grok-2-1212");
+            break;
+          case "deepseek":
+            setAvailableModels(["deepseek-chat", "deepseek-coder", "deepseek-llm-7b-chat"]);
+            setModel("deepseek-chat");
+            break;
+          default:
+            setAvailableModels([]);
+        }
       }
     }
   }, [provider, providerSettings]);
@@ -107,7 +139,9 @@ export default function CreateAgentModal({ onClose }: CreateAgentModalProps) {
   const handleProviderChange = (value: string) => {
     setProvider(value);
     
-    // Set default model for the provider
+    // Set default model for the provider - this is now handled by the useEffect that watches provider changes
+    // If the provider has configured models in Settings, they'll be used
+    // Otherwise, the defaults below are used as fallbacks
     switch (value) {
       case "openai":
         setModel("gpt-4o");
@@ -116,16 +150,19 @@ export default function CreateAgentModal({ onClose }: CreateAgentModalProps) {
         setModel("claude-3-7-sonnet-20250219");
         break;
       case "ollama":
-        setModel("ollama/llama3");
+        setModel("llama3");
         break;
       case "lmstudio":
-        setModel("lmstudio/mistral");
+        setModel("local-model");
         break;
       case "perplexity":
         setModel("llama-3.1-sonar-small-128k-online");
         break;
       case "xai":
         setModel("grok-2-1212");
+        break;
+      case "deepseek":
+        setModel("deepseek-chat");
         break;
       case "litellm":
         setModel("gpt-4o");
@@ -200,6 +237,14 @@ export default function CreateAgentModal({ onClose }: CreateAgentModalProps) {
             <SelectItem value="grok-beta">Grok Beta</SelectItem>
           </>
         );
+      case "deepseek":
+        return (
+          <>
+            <SelectItem value="deepseek-chat">DeepSeek Chat</SelectItem>
+            <SelectItem value="deepseek-coder">DeepSeek Coder</SelectItem>
+            <SelectItem value="deepseek-llm-7b-chat">DeepSeek LLM 7B Chat</SelectItem>
+          </>
+        );
       case "litellm":
         return (
           <>
@@ -264,30 +309,37 @@ export default function CreateAgentModal({ onClose }: CreateAgentModalProps) {
                 <SelectValue placeholder="Select provider" />
               </SelectTrigger>
               <SelectContent>
+                {/* Top tier cloud providers */}
                 <SelectItem value="openai">OpenAI</SelectItem>
                 <SelectItem value="anthropic">Anthropic</SelectItem>
-                <SelectItem value="perplexity">Perplexity</SelectItem>
-                <SelectItem value="xai">X AI (Grok)</SelectItem>
+                <SelectItem value="perplexity">Perplexity AI</SelectItem>
+                <SelectItem value="xai">xAI (Grok)</SelectItem>
+                <SelectItem value="deepseek">DeepSeek AI</SelectItem>
+                
+                {/* Local providers */}
                 <SelectItem value="ollama">Ollama (Local)</SelectItem>
                 <SelectItem value="lmstudio">LM Studio (Local)</SelectItem>
+                
+                {/* LiteLLM proxy */}
                 <SelectItem value="litellm">LiteLLM</SelectItem>
                 
-                {/* Custom LiteLLM providers */}
+                {/* Custom LiteLLM providers - configured in settings */}
                 {providerSettings
                   .filter(p => p.provider.startsWith('litellm-'))
                   .map(p => (
                     <SelectItem key={p.provider} value={p.provider}>
-                      {p.provider.replace('litellm-', '')}
+                      {p.provider.replace('litellm-', '')} (LiteLLM)
                     </SelectItem>
                   ))
                 }
                 
-                {/* Custom OpenAI-compatible providers */}
+                {/* Custom OpenAI-compatible providers - configured in settings */}
                 {providerSettings
-                  .filter(p => p.provider.startsWith('custom-') && !p.provider.startsWith('litellm-'))
+                  .filter(p => !['openai', 'anthropic', 'ollama', 'lmstudio', 'perplexity', 'xai', 'deepseek', 'litellm'].includes(p.provider) && 
+                              !p.provider.startsWith('litellm-'))
                   .map(p => (
                     <SelectItem key={p.provider} value={p.provider}>
-                      {p.provider.replace('custom-', '')}
+                      {p.provider.charAt(0).toUpperCase() + p.provider.slice(1)} (Custom)
                     </SelectItem>
                   ))
                 }
