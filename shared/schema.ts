@@ -9,6 +9,7 @@ export const llmProviderSettingsSchema = z.object({
   baseUrl: z.string().optional(),
   models: z.array(z.string()).optional(),
   isEnabled: z.boolean().default(true),
+  metadata: z.record(z.string(), z.any()).optional(), // For additional provider-specific data like LiteLLM provider info
 });
 
 export type LLMProviderSettings = z.infer<typeof llmProviderSettingsSchema>;

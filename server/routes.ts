@@ -7,6 +7,7 @@ import { agentManager } from "./agents/agentManager";
 import { memoryManager } from "./memory/memory";
 import { toolManager } from "./tools/toolManager";
 import { LLMManager } from "./llm/llmManager";
+import { testLiteLLMConnection, LITELLM_PROVIDERS, getSupportedModelsForProvider } from "./llm/litellmManager";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
@@ -264,6 +265,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error' 
       });
+    }
+  });
+  
+  // LiteLLM Models/Connection Test Endpoint
+  app.post('/api/litellm-test', async (req, res) => {
+    try {
+      const { provider, apiKey, baseUrl, model } = req.body;
+      
+      if (!provider) {
+        return res.status(400).json({ error: 'Provider is required' });
+      }
+      
+      // Test the connection to the LiteLLM provider and get available models
+      const result = await testLiteLLMConnection(provider, apiKey, baseUrl, model);
+      
+      res.json(result);
+    } catch (error) {
+      console.error('Error testing LiteLLM connection:', error);
+      res.status(500).json({ 
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    }
+  });
+  
+  // Get LiteLLM supported providers
+  app.get('/api/litellm-providers', async (req, res) => {
+    try {
+      res.json(LITELLM_PROVIDERS);
+    } catch (error) {
+      console.error('Error fetching LiteLLM providers:', error);
+      res.status(500).json({ error: 'Failed to fetch LiteLLM providers' });
+    }
+  });
+  
+  // Get default models for a LiteLLM provider
+  app.get('/api/litellm-models/:provider', async (req, res) => {
+    try {
+      const provider = req.params.provider;
+      const models = getSupportedModelsForProvider(provider);
+      
+      res.json({
+        provider,
+        models
+      });
+    } catch (error) {
+      console.error('Error fetching models for provider:', error);
+      res.status(500).json({ error: 'Failed to fetch provider models' });
     }
   });
   

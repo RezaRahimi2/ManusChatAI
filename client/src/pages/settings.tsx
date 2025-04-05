@@ -31,8 +31,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, Info } from "lucide-react";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -110,6 +117,7 @@ export default function Settings() {
       baseUrl: '',
       models: [],
       isEnabled: true,
+      metadata: {},
     };
   };
 
@@ -119,6 +127,65 @@ export default function Settings() {
     name: '',
     baseUrl: 'https://',
     requiresKey: true,
+  });
+  
+  // LiteLLM providers
+  const { 
+    data: litellmProviders = [] as string[], 
+    isLoading: isLoadingLitellmProviders 
+  } = useQuery<string[]>({
+    queryKey: ['/api/litellm-providers'],
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+  
+  // Create a mutation for testing LiteLLM provider connection
+  const testLiteLLMConnectionMutation = useMutation({
+    mutationFn: async ({ provider, apiKey, baseUrl, model }: { 
+      provider: string; 
+      apiKey?: string;
+      baseUrl?: string;
+      model?: string;
+    }) => {
+      const res = await apiRequest('POST', '/api/litellm-test', { provider, apiKey, baseUrl, model });
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast({
+          title: "Connection successful",
+          description: data.message || "LiteLLM provider is connected successfully.",
+        });
+      } else {
+        toast({
+          title: "Connection failed",
+          description: data.message || "Could not connect to the LiteLLM provider.",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Connection test failed",
+        description: error instanceof Error ? error.message : "Could not test the LiteLLM provider connection.",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Add LiteLLM provider state
+  const [isAddingLiteLLMProvider, setIsAddingLiteLLMProvider] = useState(false);
+  const [litellmProvider, setLitellmProvider] = useState({
+    provider: '',
+    apiKey: '',
+    baseUrl: '',
+  });
+  
+  // Get default models for a LiteLLM provider
+  const getDefaultModelsForLiteLLMProvider = useMutation({
+    mutationFn: async (provider: string) => {
+      const res = await apiRequest('GET', `/api/litellm-models/${provider}`);
+      return await res.json();
+    },
   });
 
   return (
@@ -262,7 +329,7 @@ export default function Settings() {
                     
                     {/* Custom providers */}
                     {providers
-                      .filter(p => !["openai", "anthropic", "ollama", "lmstudio", "perplexity", "xai"].includes(p.provider))
+                      .filter(p => !["openai", "anthropic", "ollama", "lmstudio", "perplexity", "xai", "litellm"].includes(p.provider))
                       .map(provider => (
                         <ProviderSettingsCard
                           key={provider.provider}
@@ -277,7 +344,157 @@ export default function Settings() {
                           requiresKey={true}
                         />
                       ))}
-                      
+                    
+                    {/* LiteLLM Provider */}
+                    <ProviderSettingsCard
+                      initialData={
+                        providers.find(p => p.provider === "litellm") ||
+                        getDefaultFormState("litellm")
+                      }
+                      onUpdate={handleProviderUpdate}
+                      onTestConnection={testConnection}
+                      defaultModels={["gpt-4o", "claude-3-7-sonnet-20250219"]} 
+                      defaultUrl="https://api.litellm.ai/v1"
+                      testingConnection={testConnectionMutation.isPending}
+                      title="LiteLLM"
+                      description="Configure LiteLLM as a proxy for multiple models"
+                    />
+                    
+                    {/* Add LiteLLM supported providers card */}
+                    <Card className="border-dashed border-2 hover:bg-accent/50 transition-colors">
+                      <CardContent className="flex items-center justify-center p-8">
+                        <Dialog open={isAddingLiteLLMProvider} onOpenChange={setIsAddingLiteLLMProvider}>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" className="gap-2">
+                              <Plus size={16} />
+                              Add LiteLLM Provider
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-md">
+                            <DialogHeader>
+                              <DialogTitle>Add LiteLLM Provider</DialogTitle>
+                              <DialogDescription>
+                                Add a provider through LiteLLM for a unified API
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="litellm-provider">Provider</Label>
+                                <Select 
+                                  onValueChange={(value) => setLitellmProvider(prev => ({ ...prev, provider: value }))}
+                                  value={litellmProvider.provider}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select a provider" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {litellmProviders.map((provider: string) => (
+                                      <SelectItem key={provider} value={provider}>
+                                        {provider}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <div className="flex items-center mt-1">
+                                  <Info className="w-4 h-4 mr-1 text-muted-foreground" />
+                                  <p className="text-xs text-muted-foreground">
+                                    Providers supported through LiteLLM integration
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <Label htmlFor="litellm-api-key">API Key</Label>
+                                <Input
+                                  id="litellm-api-key"
+                                  type="password"
+                                  placeholder="Enter provider's API key"
+                                  value={litellmProvider.apiKey}
+                                  onChange={(e) => setLitellmProvider(prev => ({ ...prev, apiKey: e.target.value }))}
+                                />
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <Label htmlFor="litellm-base-url">Base URL (Optional)</Label>
+                                <Input
+                                  id="litellm-base-url"
+                                  placeholder="Enter provider's base URL if needed"
+                                  value={litellmProvider.baseUrl}
+                                  onChange={(e) => setLitellmProvider(prev => ({ ...prev, baseUrl: e.target.value }))}
+                                />
+                              </div>
+                              
+                              <div className="flex justify-between mt-4">
+                                <Button 
+                                  variant="outline" 
+                                  onClick={() => {
+                                    if (litellmProvider.provider) {
+                                      testLiteLLMConnectionMutation.mutate({
+                                        provider: litellmProvider.provider,
+                                        apiKey: litellmProvider.apiKey,
+                                        baseUrl: litellmProvider.baseUrl || undefined
+                                      });
+                                    }
+                                  }}
+                                  disabled={!litellmProvider.provider || !litellmProvider.apiKey || testLiteLLMConnectionMutation.isPending}
+                                >
+                                  {testLiteLLMConnectionMutation.isPending ? (
+                                    <>
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                      Testing...
+                                    </>
+                                  ) : (
+                                    "Test Connection"
+                                  )}
+                                </Button>
+                                
+                                <Button 
+                                  onClick={() => {
+                                    if (!litellmProvider.provider || !litellmProvider.apiKey) {
+                                      return;
+                                    }
+                                    
+                                    const newProvider = getDefaultFormState(`litellm-${litellmProvider.provider}`);
+                                    newProvider.apiKey = litellmProvider.apiKey;
+                                    newProvider.baseUrl = litellmProvider.baseUrl || '';
+                                    newProvider.metadata = {
+                                      litellmProvider: litellmProvider.provider
+                                    };
+                                    
+                                    // Get default models for this provider if possible
+                                    getDefaultModelsForLiteLLMProvider.mutate(litellmProvider.provider, {
+                                      onSuccess: (data) => {
+                                        if (data.models && data.models.length > 0) {
+                                          newProvider.models = data.models.slice(0, 5).map((model: any) => model.id);
+                                        } else {
+                                          newProvider.models = ["default-model"];
+                                        }
+                                        handleProviderUpdate(newProvider);
+                                      },
+                                      onError: () => {
+                                        newProvider.models = ["default-model"];
+                                        handleProviderUpdate(newProvider);
+                                      }
+                                    });
+                                    
+                                    setIsAddingLiteLLMProvider(false);
+                                    setLitellmProvider({
+                                      provider: '',
+                                      apiKey: '',
+                                      baseUrl: '',
+                                    });
+                                  }}
+                                  disabled={!litellmProvider.provider || !litellmProvider.apiKey}
+                                >
+                                  Add Provider
+                                </Button>
+                              </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      </CardContent>
+                    </Card>
+                    
                     {/* Add custom provider button */}
                     <Card className="border-dashed border-2 hover:bg-accent/50 transition-colors">
                       <CardContent className="flex items-center justify-center p-8">

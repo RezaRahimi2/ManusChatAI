@@ -90,6 +90,48 @@ export class LLMManager {
     // Update settings from storage before making the request
     await this.updateSettings();
 
+    // LiteLLM supported providers that we'll handle differently
+    const litellmSupportedProviders = [
+      'groq', 'together', 'gemini', 'claude', 'azure', 'replicate',
+      'cohere', 'mistral', 'vertexai', 'bedrock', 'huggingface'
+    ];
+
+    // Check if this is a LiteLLM-supported provider
+    if (litellmSupportedProviders.includes(provider)) {
+      return this.generateWithLiteLLM(provider, model, messages, temperature, maxTokens, tools);
+    }
+    
+    // Check if this is a provider added via LiteLLM (prefixed with litellm-)
+    if (provider.startsWith('litellm-')) {
+      try {
+        // Extract the actual provider name from the prefix
+        const actualProvider = provider.replace('litellm-', '');
+        
+        // Get the provider settings to properly set API key and base URL
+        const { storage } = await import('./storage');
+        const providerSettings = await storage.getLLMProviderSettings(provider);
+        
+        if (providerSettings?.apiKey) {
+          // Update our API keys for this request
+          this.apiKeys[actualProvider] = providerSettings.apiKey;
+          
+          // Set base URL if provided in settings
+          if (providerSettings.baseUrl) {
+            this.baseUrls[actualProvider] = providerSettings.baseUrl;
+          }
+          
+          // Use the LiteLLM method but with the actual provider name
+          return this.generateWithLiteLLM(actualProvider, model, messages, temperature, maxTokens, tools);
+        } else {
+          throw new Error(`API key for ${provider} is required but not found in settings`);
+        }
+      } catch (error) {
+        console.error(`Error using LiteLLM provider ${provider}:`, error);
+        throw new Error(`Failed to use LiteLLM provider: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    // Handle directly supported providers
     switch (provider) {
       case 'openai':
         return this.generateOpenAI(model, messages, temperature, maxTokens, tools);
@@ -465,16 +507,47 @@ export class LLMManager {
         payload.tool_choice = 'auto';
       }
 
+      // Handle provider-specific authentication and headers
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Most providers use Bearer authentication
+      if (this.apiKeys[provider]) {
+        headers['Authorization'] = `Bearer ${this.apiKeys[provider]}`;
+      }
+      
+      // Handle specific providers with different auth mechanisms
+      if (provider === 'gemini') {
+        delete headers['Authorization']; // Remove Bearer prefix
+        headers['x-goog-api-key'] = this.apiKeys[provider];
+      }
+
+      // Default to OpenAI-compatible /chat/completions endpoint
+      let endpoint = '/chat/completions';
+      
+      // Handle provider-specific endpoints if needed
+      if (provider === 'gemini') {
+        endpoint = `/v1beta/models/${actualModel}:generateContent`;
+      }
+
       const response = await axios.post(
-        `${this.baseUrls[provider]}/chat/completions`,
+        `${this.baseUrls[provider]}${endpoint}`,
         payload,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.apiKeys[provider]}`,
-          },
-        }
+        { headers }
       );
+
+      // Transform non-standard responses to OpenAI format if needed
+      if (provider === 'gemini' && response.data.candidates) {
+        return {
+          choices: [{
+            message: {
+              role: 'assistant',
+              content: response.data.candidates[0]?.content?.parts[0]?.text || '',
+            }
+          }]
+        };
+      }
 
       return response.data;
     } catch (error) {
@@ -483,6 +556,60 @@ export class LLMManager {
         console.error('Response data:', error.response.data);
       }
       throw new Error(`${provider} API Error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  // Use LiteLLM to generate response - this allows handling many different providers
+  private async generateWithLiteLLM(
+    provider: string,
+    model: string,
+    messages: LLMMessage[],
+    temperature: number,
+    maxTokens: number,
+    tools?: LLMTool[]
+  ): Promise<LLMResponse> {
+    try {
+      // For LiteLLM providers we'll use our custom OpenAI-compatible approach
+      // with appropriate customizations for each provider
+      
+      // Ensure we have the provider set up
+      if (!this.apiKeys[provider]) {
+        throw new Error(`API key for ${provider} is required but not set`);
+      }
+      
+      // Add the provider to the baseUrls if needed
+      if (!this.baseUrls[provider]) {
+        // Set a default URL for the provider if we don't have one
+        switch(provider) {
+          case 'groq':
+            this.baseUrls[provider] = 'https://api.groq.com/openai/v1';
+            break;
+          case 'together':
+            this.baseUrls[provider] = 'https://api.together.xyz/v1';
+            break;
+          case 'anthropic':
+          case 'claude':
+            this.baseUrls[provider] = 'https://api.anthropic.com/v1';
+            break;
+          case 'cohere':
+            this.baseUrls[provider] = 'https://api.cohere.ai/v1';
+            break;
+          case 'mistral':
+            this.baseUrls[provider] = 'https://api.mistral.ai/v1';
+            break;
+          case 'gemini':
+            this.baseUrls[provider] = 'https://generativelanguage.googleapis.com';
+            break;
+          default:
+            throw new Error(`Base URL for ${provider} is required but not set`);
+        }
+      }
+      
+      // Now use the custom OpenAI-compatible method to handle the request
+      return this.generateCustomOpenAICompatible(provider, model, messages, temperature, maxTokens, tools);
+    } catch (error) {
+      console.error(`LiteLLM API Error for ${provider}:`, error);
+      throw new Error(`LiteLLM API Error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }
