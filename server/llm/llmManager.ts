@@ -41,6 +41,7 @@ export class LLMManager {
     anthropic: process.env.ANTHROPIC_API_KEY || '',
     perplexity: process.env.PERPLEXITY_API_KEY || '',
     xai: process.env.XAI_API_KEY || '',
+    deepseek: process.env.DEEPSEEK_API_KEY || '',
   };
   
   private baseUrls: Record<string, string> = {
@@ -50,6 +51,7 @@ export class LLMManager {
     lmstudio: process.env.LMSTUDIO_BASE_URL || 'http://localhost:1234/v1',
     perplexity: 'https://api.perplexity.ai',
     xai: 'https://api.x.ai/v1',
+    deepseek: 'https://api.deepseek.com/v1',
   };
 
   constructor() {
@@ -93,7 +95,7 @@ export class LLMManager {
     // LiteLLM supported providers that we'll handle differently
     const litellmSupportedProviders = [
       'groq', 'together', 'gemini', 'claude', 'azure', 'replicate',
-      'cohere', 'mistral', 'vertexai', 'bedrock', 'huggingface'
+      'cohere', 'mistral', 'vertexai', 'bedrock', 'huggingface', 'deepseek'
     ];
 
     // Check if this is a LiteLLM-supported provider or the litellm provider itself
@@ -145,6 +147,8 @@ export class LLMManager {
         return this.generatePerplexity(model, messages, temperature, maxTokens);
       case 'xai':
         return this.generateXAI(model, messages, temperature, maxTokens);
+      case 'deepseek':
+        return this.generateDeepSeek(model, messages, temperature, maxTokens);
       default:
         // Check if this is a custom provider
         if (this.baseUrls[provider] && this.apiKeys[provider]) {
@@ -475,6 +479,46 @@ export class LLMManager {
     }
   }
 
+  private async generateDeepSeek(
+    model: string,
+    messages: LLMMessage[],
+    temperature: number,
+    maxTokens: number
+  ): Promise<LLMResponse> {
+    try {
+      if (!this.apiKeys.deepseek) {
+        throw new Error('DeepSeek API key is required but not set');
+      }
+      
+      // Set default model if not specified
+      const actualModel = model || 'deepseek-chat';
+      
+      const response = await axios.post(
+        `${this.baseUrls.deepseek}/chat/completions`,
+        {
+          model: actualModel,
+          messages,
+          temperature,
+          max_tokens: maxTokens,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKeys.deepseek}`,
+          },
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error('DeepSeek API Error:', error);
+      if (axios.isAxiosError(error) && error.response) {
+        console.error('Response data:', error.response.data);
+      }
+      throw new Error(`DeepSeek API Error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   private async generateCustomOpenAICompatible(
     provider: string,
     model: string,
@@ -599,6 +643,9 @@ export class LLMManager {
             break;
           case 'gemini':
             this.baseUrls[provider] = 'https://generativelanguage.googleapis.com';
+            break;
+          case 'deepseek':
+            this.baseUrls[provider] = 'https://api.deepseek.com/v1';
             break;
           default:
             throw new Error(`Base URL for ${provider} is required but not set`);
