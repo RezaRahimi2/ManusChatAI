@@ -5,6 +5,7 @@ import { FileSystem } from './fileSystem';
 import { CodeExecution } from './codeExecution';
 import { ApiConnector } from './apiConnector';
 import { LocalDeepResearchTool } from './localDeepResearch';
+import { PlanExecution } from './planExecution';
 
 // Interface for tool implementation
 export interface ITool {
@@ -99,6 +100,16 @@ export class ToolManager {
           defaultCollection: 'agent_interactions',
           topK: 5
         }
+      },
+      {
+        name: 'Plan Execution',
+        description: 'Execute and manage plans created by the planner agent',
+        type: 'plan_execution',
+        isEnabled: true,
+        config: {
+          defaultCollection: 'plans',
+          maxStepDelegations: 5
+        }
       }
     ];
     
@@ -126,6 +137,9 @@ export class ToolManager {
         break;
       case 'deep_research':
         tool = new LocalDeepResearchTool(toolData);
+        break;
+      case 'plan_execution':
+        tool = new PlanExecution(toolData);
         break;
       default:
         throw new Error(`Unknown tool type: ${toolData.type}`);

@@ -171,10 +171,54 @@ export class EnhancedOrchestrator extends BaseAgent {
       );
       
       // Synthesize the results
-      const finalResponse = await this.collaborationProtocol.synthesizeResults(
+      const rawFinalResponse = await this.collaborationProtocol.synthesizeResults(
         executedCollaboration,
         this
       );
+      
+      // Get a thinker agent to analyze the response with CoT reasoning if available
+      let finalResponse = rawFinalResponse;
+      try {
+        const allAgents = await agentManager.getAllAgents();
+        const thinkerAgent = allAgents.find(agent => agent.type === 'thinker' && agent.isActive);
+        
+        if (thinkerAgent) {
+          const thinkerInstance = agentManager.getAgentInstance(thinkerAgent.id);
+          
+          if (thinkerInstance) {
+            // Create thinking message to show analysis is in progress
+            const thinkingMessage: Message = {
+              id: Date.now(),
+              workspaceId,
+              role: 'system',
+              content: 'Analyzing response with Chain of Thought reasoning...',
+              agentId: thinkerAgent.id,
+              metadata: { isThinking: true },
+              createdAt: Date.now()
+            };
+            
+            await storage.createMessage(thinkingMessage);
+            
+            // Broadcast thinking message
+            broadcastToWorkspace(workspaceId, {
+              type: 'message',
+              workspaceId,
+              message: thinkingMessage
+            });
+            
+            // Have the thinker agent analyze the response
+            const enhancedResponse = await thinkerInstance.generateResponse(workspaceId, rawFinalResponse);
+            
+            // Use the enhanced response if it's valid
+            if (enhancedResponse && enhancedResponse.trim().length > 0) {
+              finalResponse = enhancedResponse;
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error using Thinker Agent for analysis:", error);
+        // Fall back to the raw response if there's an error
+      }
       
       // Create orchestrator final response message
       const responseMessage: Message = {
@@ -186,7 +230,8 @@ export class EnhancedOrchestrator extends BaseAgent {
         metadata: {
           collaborationId: executedCollaboration.id,
           collaborationMode: executedCollaboration.mode,
-          type: 'final_response'
+          type: 'final_response',
+          enhanced: finalResponse !== rawFinalResponse
         },
         createdAt: Date.now()
       };

@@ -6,6 +6,8 @@ import { EnhancedOrchestrator } from './enhancedOrchestrator';
 import { ResearchAgent } from './researchAgent';
 import { CodeAgent } from './codeAgent';
 import { WriterAgent } from './writerAgent';
+import { PlannerAgent } from './plannerAgent';
+import { ThinkerAgent } from './thinkerAgent';
 import { LLMManager } from '../llm/llmManager';
 import { memoryManager } from '../memory/memory';
 import { toolManager } from '../tools/toolManager';
@@ -65,6 +67,20 @@ class AgentManager {
       isActive: false
     });
     
+    // Create planner agent based on Genspark approach
+    await this.createAgent({
+      name: 'Planner Agent',
+      description: 'Creates detailed step-by-step plans for complex tasks, based on Genspark\'s plan-and-execute approach',
+      type: 'planner',
+      systemPrompt: 'You are a highly sophisticated Planning Agent specialized in breaking down complex tasks into clear, executable steps. When presented with a goal or task, your primary responsibility is to analyze the task, decompose it into logical steps, ensure steps are clear and actionable, consider dependencies, include necessary tools or resources, anticipate challenges, and structure the plan with clear organization. Format your plans with detailed numbering, specific actions, and tool recommendations for each step.',
+      model: 'gpt-4',
+      provider: 'openai',
+      temperature: 0.3,
+      maxTokens: 4000,
+      tools: ['plan_execution', 'deep_research', 'web_browser'],
+      isActive: true
+    });
+    
     // Create research agent
     await this.createAgent({
       name: 'Research Agent',
@@ -106,6 +122,20 @@ class AgentManager {
       tools: [],
       isActive: true
     });
+    
+    // Create thinker agent with Chain of Thought reasoning
+    await this.createAgent({
+      name: 'Thinker Agent',
+      description: 'Analyzes content using Chain of Thought (CoT) reasoning',
+      type: 'thinker',
+      systemPrompt: 'You are a Thinker Agent specializing in Chain of Thought (CoT) reasoning. Your role is to analyze responses, break down complex reasoning into explicit steps, identify assumptions and logical gaps, evaluate evidence quality, consider alternative perspectives, highlight potential biases, and suggest improvements to enhance logical flow. Structure your analysis into clear, numbered reasoning steps and be explicitly metacognitive about your thought process.',
+      model: 'gpt-4',
+      provider: 'openai',
+      temperature: 0.4,
+      maxTokens: 4000,
+      tools: ['deep_research'],
+      isActive: true
+    });
   }
   
   private createAgentInstance(agentData: Agent): BaseAgent {
@@ -123,6 +153,22 @@ class AgentManager {
         break;
       case 'orchestrator':
         agent = new Orchestrator(
+          agentData,
+          this.llmManager,
+          memoryManager,
+          toolManager
+        );
+        break;
+      case 'planner':
+        agent = new PlannerAgent(
+          agentData,
+          this.llmManager,
+          memoryManager,
+          toolManager
+        );
+        break;
+      case 'thinker':
+        agent = new ThinkerAgent(
           agentData,
           this.llmManager,
           memoryManager,
@@ -179,10 +225,18 @@ class AgentManager {
   }
   
   async createAgent(agentData: InsertAgent): Promise<Agent> {
-    const newAgent = await storage.createAgent({
+    // Ensure null values for optional fields that are undefined
+    const processedAgentData = {
       ...agentData,
+      description: agentData.description ?? null,
+      systemPrompt: agentData.systemPrompt ?? null,
+      maxTokens: agentData.maxTokens ?? null,
+      isActive: agentData.isActive ?? true,
+      tools: agentData.tools ?? null,
       createdAt: Date.now()
-    });
+    };
+    
+    const newAgent = await storage.createAgent(processedAgentData);
     
     // Create agent instance
     this.createAgentInstance(newAgent);
