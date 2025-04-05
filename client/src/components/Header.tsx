@@ -10,6 +10,7 @@ export default function Header({ onToggleSidebar, onToggleDetails }: HeaderProps
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [location] = useLocation();
   const isSettingsPage = location === "/settings";
+  const isFlowDiagramPage = location === "/flow-diagram";
 
   return (
     <header className="bg-white dark:bg-neutral-800 shadow-sm border-b border-neutral-200 dark:border-neutral-700 py-2 px-4">
@@ -31,6 +32,11 @@ export default function Header({ onToggleSidebar, onToggleDetails }: HeaderProps
           </Link>
         </div>
         <div className="flex items-center">
+          <Link href="/flow-diagram">
+            <button className={`mr-4 p-2 rounded-full ${isFlowDiagramPage ? 'bg-neutral-200 dark:bg-neutral-700' : 'hover:bg-neutral-100 dark:hover:bg-neutral-700'}`}>
+              <span className="material-icons">account_tree</span>
+            </button>
+          </Link>
           <Link href="/settings">
             <button className={`mr-4 p-2 rounded-full ${isSettingsPage ? 'bg-neutral-200 dark:bg-neutral-700' : 'hover:bg-neutral-100 dark:hover:bg-neutral-700'}`}>
               <span className="material-icons">settings</span>

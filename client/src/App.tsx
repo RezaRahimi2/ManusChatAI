@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Settings from "@/pages/settings";
+import FlowDiagram from "@/pages/flow-diagram";
 import { AgentProvider } from "./context/AgentContext";
 import { WorkspaceProvider } from "./context/WorkspaceContext";
 
@@ -13,6 +14,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/settings" component={Settings} />
+      <Route path="/flow-diagram" component={FlowDiagram} />
       <Route component={NotFound} />
     </Switch>
   );
