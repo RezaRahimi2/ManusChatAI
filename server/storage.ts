@@ -1,4 +1,4 @@
-import { users, type User, type InsertUser, Agent, InsertAgent, Tool, Message, Workspace, InsertWorkspace, Memory } from "@shared/schema";
+import { users, type User, type InsertUser, Agent, InsertAgent, Tool, Message, Workspace, InsertWorkspace, Memory, LLMProviderSettings } from "@shared/schema";
 
 // modify the interface with any CRUD methods
 // you might need
@@ -44,6 +44,11 @@ export interface IStorage {
   createMemory(memory: Omit<Memory, 'id'>): Promise<Memory>;
   deleteMemory(id: number): Promise<void>;
   deleteMemoryByKey(key: string): Promise<void>;
+  
+  // LLM Provider Settings methods
+  getLLMProviderSettings(provider: string): Promise<LLMProviderSettings | undefined>;
+  getAllLLMProviderSettings(): Promise<LLMProviderSettings[]>;
+  setLLMProviderSettings(settings: LLMProviderSettings): Promise<LLMProviderSettings>;
 }
 
 export class MemStorage implements IStorage {
@@ -53,6 +58,7 @@ export class MemStorage implements IStorage {
   private messages: Map<number, Message>;
   private tools: Map<number, Tool>;
   private memories: Map<number, Memory>;
+  private llmProviders: Map<string, LLMProviderSettings>;
   private currentId: number;
 
   constructor() {
@@ -62,13 +68,33 @@ export class MemStorage implements IStorage {
     this.messages = new Map();
     this.tools = new Map();
     this.memories = new Map();
+    this.llmProviders = new Map();
     this.currentId = 1;
+    
+    // Initialize default LLM providers
+    this.initializeLLMProviders();
     
     // Initialize with a default workspace
     this.createWorkspace({
       name: "Main Workspace",
       createdAt: Date.now()
     });
+  }
+  
+  private initializeLLMProviders(): void {
+    // Set up default LLM providers
+    const defaultProviders: LLMProviderSettings[] = [
+      { provider: 'openai', isEnabled: false },
+      { provider: 'anthropic', isEnabled: false },
+      { provider: 'ollama', baseUrl: 'http://localhost:11434', isEnabled: true },
+      { provider: 'lmstudio', baseUrl: 'http://localhost:1234/v1', isEnabled: true },
+      { provider: 'perplexity', isEnabled: false },
+      { provider: 'xai', isEnabled: false }
+    ];
+    
+    for (const provider of defaultProviders) {
+      this.llmProviders.set(provider.provider, provider);
+    }
   }
 
   // User methods
@@ -242,6 +268,20 @@ export class MemStorage implements IStorage {
     if (memory) {
       this.memories.delete(memory.id);
     }
+  }
+  
+  // LLM Provider Settings methods
+  async getLLMProviderSettings(provider: string): Promise<LLMProviderSettings | undefined> {
+    return this.llmProviders.get(provider);
+  }
+  
+  async getAllLLMProviderSettings(): Promise<LLMProviderSettings[]> {
+    return Array.from(this.llmProviders.values());
+  }
+  
+  async setLLMProviderSettings(settings: LLMProviderSettings): Promise<LLMProviderSettings> {
+    this.llmProviders.set(settings.provider, settings);
+    return settings;
   }
 }
 

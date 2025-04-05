@@ -39,6 +39,8 @@ export class LLMManager {
   private apiKeys: Record<string, string> = {
     openai: process.env.OPENAI_API_KEY || '',
     anthropic: process.env.ANTHROPIC_API_KEY || '',
+    perplexity: process.env.PERPLEXITY_API_KEY || '',
+    xai: process.env.XAI_API_KEY || '',
   };
   
   private baseUrls: Record<string, string> = {
@@ -46,6 +48,8 @@ export class LLMManager {
     anthropic: 'https://api.anthropic.com/v1',
     ollama: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
     lmstudio: process.env.LMSTUDIO_BASE_URL || 'http://localhost:1234/v1',
+    perplexity: 'https://api.perplexity.ai',
+    xai: 'https://api.x.ai/v1',
   };
 
   constructor() {
@@ -57,9 +61,34 @@ export class LLMManager {
     // Additional keys could be loaded here
     console.log(`LLM providers configured: ${Object.keys(this.baseUrls).join(', ')}`);
   }
+  
+  // Update API keys and base URLs from storage
+  async updateSettings(): Promise<void> {
+    try {
+      const { storage } = await import('../storage');
+      const providers = await storage.getAllLLMProviderSettings();
+      
+      for (const provider of providers) {
+        // Update API key if provided
+        if (provider.apiKey) {
+          this.apiKeys[provider.provider] = provider.apiKey;
+        }
+        
+        // Update base URL if provided
+        if (provider.baseUrl) {
+          this.baseUrls[provider.provider] = provider.baseUrl;
+        }
+      }
+    } catch (error) {
+      console.error('Error loading LLM provider settings:', error);
+    }
+  }
 
   async generateResponse(params: LLMGenerateParams): Promise<LLMResponse> {
     const { provider, model, messages, temperature = 0.7, maxTokens = 1000, tools } = params;
+    
+    // Update settings from storage before making the request
+    await this.updateSettings();
 
     switch (provider) {
       case 'openai':
@@ -70,6 +99,10 @@ export class LLMManager {
         return this.generateOllama(model, messages, temperature, maxTokens);
       case 'lmstudio':
         return this.generateLMStudio(model, messages, temperature, maxTokens);
+      case 'perplexity':
+        return this.generatePerplexity(model, messages, temperature, maxTokens);
+      case 'xai':
+        return this.generateXAI(model, messages, temperature, maxTokens);
       default:
         throw new Error(`Unsupported LLM provider: ${provider}`);
     }
@@ -306,6 +339,92 @@ export class LLMManager {
         console.error('Response data:', error.response.data);
       }
       throw new Error(`LM Studio API Error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  private async generatePerplexity(
+    model: string,
+    messages: LLMMessage[],
+    temperature: number,
+    maxTokens: number
+  ): Promise<LLMResponse> {
+    try {
+      if (!this.apiKeys.perplexity) {
+        throw new Error('Perplexity API key is required but not set');
+      }
+      
+      // Set default model if not specified
+      const actualModel = model || 'llama-3.1-sonar-small-128k-online';
+      
+      const payload = {
+        model: actualModel,
+        messages,
+        temperature,
+        max_tokens: maxTokens || 1000,
+        top_p: 0.9,
+        frequency_penalty: 1,
+        presence_penalty: 0,
+        stream: false,
+      };
+      
+      const response = await axios.post(
+        `${this.baseUrls.perplexity}/chat/completions`,
+        payload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKeys.perplexity}`,
+          },
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error('Perplexity API Error:', error);
+      if (axios.isAxiosError(error) && error.response) {
+        console.error('Response data:', error.response.data);
+      }
+      throw new Error(`Perplexity API Error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  private async generateXAI(
+    model: string,
+    messages: LLMMessage[],
+    temperature: number,
+    maxTokens: number
+  ): Promise<LLMResponse> {
+    try {
+      if (!this.apiKeys.xai) {
+        throw new Error('xAI API key is required but not set');
+      }
+      
+      // Set default model if not specified
+      const actualModel = model || 'grok-2-1212';
+      
+      const response = await axios.post(
+        `${this.baseUrls.xai}/chat/completions`,
+        {
+          model: actualModel,
+          messages,
+          temperature,
+          max_tokens: maxTokens,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKeys.xai}`,
+          },
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error('xAI API Error:', error);
+      if (axios.isAxiosError(error) && error.response) {
+        console.error('Response data:', error.response.data);
+      }
+      throw new Error(`xAI API Error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }

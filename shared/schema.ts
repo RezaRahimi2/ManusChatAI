@@ -2,6 +2,17 @@ import { pgTable, text, serial, integer, boolean, jsonb } from "drizzle-orm/pg-c
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// LLM Provider Settings
+export const llmProviderSettingsSchema = z.object({
+  provider: z.enum(['openai', 'anthropic', 'ollama', 'lmstudio', 'perplexity', 'xai']),
+  apiKey: z.string().optional(),
+  baseUrl: z.string().optional(),
+  models: z.array(z.string()).optional(),
+  isEnabled: z.boolean().default(true),
+});
+
+export type LLMProviderSettings = z.infer<typeof llmProviderSettingsSchema>;
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
