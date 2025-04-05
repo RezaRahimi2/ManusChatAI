@@ -3,9 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import ChatInput from "@/components/chat/ChatInput";
 import ChatMessage from "@/components/chat/ChatMessage";
 import ThinkingMessage from "@/components/chat/ThinkingMessage";
-import { useSocket } from "@/lib/socket";
+import { useSocket, addMessageListener, removeMessageListener, sendChatMessage, joinWorkspace } from "@/lib/socket";
 import { useAgentContext } from "@/context/AgentContext";
 import { Message } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
 
 interface WorkspaceProps {
   workspaceId: number;
@@ -14,8 +15,9 @@ interface WorkspaceProps {
 export default function Workspace({ workspaceId }: WorkspaceProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { getAgentById } = useAgentContext();
-  const socket = useSocket();
+  const { isConnected, lastError, sendChatMessage } = useSocket();
   const [thinking, setThinking] = useState(false);
+  const { toast } = useToast();
   
   // Fetch messages for this workspace
   const { data: messages = [], isLoading, refetch } = useQuery<Message[]>({
@@ -29,80 +31,95 @@ export default function Workspace({ workspaceId }: WorkspaceProps) {
     }
   });
   
-  // Send message function
+  // Show error toast if WebSocket has an error
+  useEffect(() => {
+    if (lastError) {
+      toast({
+        title: "Connection Error",
+        description: lastError,
+        variant: "destructive"
+      });
+    }
+  }, [lastError, toast]);
+  
+  // Send message function using our improved socket utility
   const sendMessage = async (content: string) => {
-    if (!content.trim() || !socket) return;
-    
-    // Add user message optimistically
-    const userMessage = {
-      id: Date.now(),
-      workspaceId,
-      role: 'user',
-      content,
-      createdAt: Date.now()
-    };
-    
-    // Emit message to server
-    socket.send(JSON.stringify({
-      type: 'message',
-      workspaceId,
-      message: userMessage
-    }));
+    if (!content.trim() || !isConnected) return;
     
     // Set thinking state for the UI
     setThinking(true);
+    
+    // Send message via socket utility
+    const sent = sendChatMessage(workspaceId, content);
+    
+    if (!sent) {
+      toast({
+        title: "Failed to send message",
+        description: "There was a problem connecting to the server. Please try again.",
+        variant: "destructive"
+      });
+      setThinking(false);
+    }
   };
   
   // Listen for new messages from socket and join workspace
   useEffect(() => {
-    if (!socket) return;
+    if (!isConnected) return;
     
     // Join the workspace when socket connects
-    socket.send(JSON.stringify({
-      type: 'join_workspace',
-      workspaceId
-    }));
+    joinWorkspace(workspaceId);
     
     console.log('Joining workspace:', workspaceId);
     
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log('Workspace received message:', data);
-        
-        if (data.type === 'thinking') {
-          console.log('Setting thinking state to:', data.thinking);
-          setThinking(data.thinking);
-        } else if (data.type === 'message' && data.workspaceId === workspaceId) {
-          console.log('Received new message for workspace, refetching messages');
-          // Refetch messages to get the latest
-          refetch();
-          setThinking(false);
-        } else if (data.type === 'joined_workspace') {
-          console.log('Successfully joined workspace:', data.workspaceId);
-        } else if (data.type === 'error') {
-          console.error('Received error from server:', data.error);
-        } else {
-          console.log('Unhandled message type:', data.type);
-        }
-      } catch (error) {
-        console.error('Error handling WebSocket message:', error);
+    // Define message handlers for different message types
+    const handleThinkingMessage = (data: any) => {
+      console.log('Setting thinking state to:', data.thinking);
+      setThinking(data.thinking);
+    };
+    
+    const handleNewMessage = (data: any) => {
+      if (data.workspaceId === workspaceId) {
+        console.log('Received new message for workspace, refetching messages');
+        // Refetch messages to get the latest
+        refetch();
+        setThinking(false);
       }
     };
     
-    socket.addEventListener('message', handleMessage);
+    const handleWorkspaceJoined = (data: any) => {
+      if (data.workspaceId === workspaceId) {
+        console.log('Successfully joined workspace:', data.workspaceId);
+      }
+    };
+    
+    const handleErrorMessage = (data: any) => {
+      console.error('Received error from server:', data.error);
+      toast({
+        title: "Server Error",
+        description: data.error || "Unknown error occurred",
+        variant: "destructive"
+      });
+      if (data.workspaceId === workspaceId) {
+        setThinking(false);
+      }
+    };
+    
+    // Register message handlers
+    addMessageListener('thinking', handleThinkingMessage);
+    addMessageListener('message', handleNewMessage);
+    addMessageListener('joined_workspace', handleWorkspaceJoined);
+    addMessageListener('error', handleErrorMessage);
     
     return () => {
-      // Leave the workspace when unmounting
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({
-          type: 'leave_workspace',
-          workspaceId
-        }));
-      }
-      socket.removeEventListener('message', handleMessage);
+      // Clean up all event listeners
+      removeMessageListener('thinking', handleThinkingMessage);
+      removeMessageListener('message', handleNewMessage);
+      removeMessageListener('joined_workspace', handleWorkspaceJoined);
+      removeMessageListener('error', handleErrorMessage);
+      
+      // Leave workspace handled by the socket.ts implementation
     };
-  }, [socket, workspaceId, refetch]);
+  }, [isConnected, workspaceId, refetch, toast]);
   
   // Scroll to bottom when messages change
   useEffect(() => {

@@ -1,17 +1,18 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import { AgentManager } from './agents/agentManager';
+import { agentManager } from './agents/agentManager';
 
 // Client connection tracking
 const workspaceClients = new Map<number, Set<WebSocket>>();
 const clientWorkspaces = new Map<WebSocket, Set<number>>();
 
-export function setupWebSocketHandlers(wss: WebSocketServer, agentManager: AgentManager): void {
+export function setupWebSocketHandlers(wss: WebSocketServer, agentManagerInstance: any): void {
   wss.on('connection', (ws: WebSocket) => {
     console.log('WebSocket client connected');
     
     ws.on('message', async (data: string) => {
       try {
         const message = JSON.parse(data);
+        console.log('Received WebSocket message:', message.type);
         
         switch (message.type) {
           case 'join_workspace':
@@ -25,19 +26,49 @@ export function setupWebSocketHandlers(wss: WebSocketServer, agentManager: Agent
           case 'message':
             // Process new message
             if (message.workspaceId && message.message && message.message.content) {
+              console.log(`Processing message for workspace ${message.workspaceId}: "${message.message.content.substring(0, 50)}${message.message.content.length > 50 ? '...' : ''}"`);
+              
               // Add client to workspace if not already joined
               joinWorkspace(ws, message.workspaceId);
               
-              // Process the message
-              await agentManager.processMessage(
-                message.workspaceId,
-                message.message.content
-              );
+              try {
+                // Process the message
+                await agentManager.processMessage(
+                  message.workspaceId,
+                  message.message.content
+                );
+                console.log(`Successfully processed message for workspace ${message.workspaceId}`);
+              } catch (processError) {
+                console.error(`Error processing message with agentManager:`, processError);
+                
+                // Send specific error about message processing
+                ws.send(JSON.stringify({
+                  type: 'error',
+                  workspaceId: message.workspaceId,
+                  error: processError instanceof Error ? processError.message : 'Failed to process message',
+                  timestamp: Date.now()
+                }));
+              }
+            } else {
+              console.error('Invalid message format:', message);
+              ws.send(JSON.stringify({
+                type: 'error',
+                error: 'Invalid message format. Must include workspaceId, message, and content.',
+                timestamp: Date.now()
+              }));
             }
             break;
             
+          case 'ping':
+            // Respond to ping with pong
+            ws.send(JSON.stringify({
+              type: 'pong',
+              timestamp: Date.now()
+            }));
+            break;
+            
           default:
-            console.warn('Unknown message type:', message.type);
+            console.log('Received message with type:', message.type);
         }
       } catch (error) {
         console.error('Error processing WebSocket message:', error);
@@ -45,7 +76,8 @@ export function setupWebSocketHandlers(wss: WebSocketServer, agentManager: Agent
         // Send error back to client
         ws.send(JSON.stringify({
           type: 'error',
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: Date.now()
         }));
       }
     });
@@ -121,15 +153,21 @@ function cleanupClient(ws: WebSocket): void {
   const workspaces = clientWorkspaces.get(ws);
   
   if (workspaces) {
+    // Convert to array to avoid downlevelIteration issues
+    const workspaceIds = Array.from(workspaces);
+    
     // Remove client from all workspace clients
-    for (const workspaceId of workspaces) {
-      workspaceClients.get(workspaceId)?.delete(ws);
-      
-      // Clean up empty workspace sets
-      if (workspaceClients.get(workspaceId)?.size === 0) {
-        workspaceClients.delete(workspaceId);
+    workspaceIds.forEach(workspaceId => {
+      const clients = workspaceClients.get(workspaceId);
+      if (clients) {
+        clients.delete(ws);
+        
+        // Clean up empty workspace sets
+        if (clients.size === 0) {
+          workspaceClients.delete(workspaceId);
+        }
       }
-    }
+    });
     
     // Remove client entry
     clientWorkspaces.delete(ws);

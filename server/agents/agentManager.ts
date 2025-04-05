@@ -274,35 +274,53 @@ class AgentManager {
   }
   
   async processMessage(workspaceId: number, message: string): Promise<void> {
-    // First try to find an enhanced orchestrator
-    let orchestrator: BaseAgent | undefined;
-    let fallbackOrchestrator: BaseAgent | undefined;
+    console.log(`AgentManager processing message for workspace ${workspaceId}: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
     
-    // Convert values iterator to array to avoid TS downlevelIteration issues
-    const agentInstances = Array.from(this.agents.values());
-    
-    // First find the enhanced orchestrator if available
-    for (const agent of agentInstances) {
-      if (agent.getType() === 'enhanced_orchestrator' && agent.getConfig().isActive) {
-        orchestrator = agent;
-        break;
-      } else if (agent.getType() === 'orchestrator' && agent.getConfig().isActive) {
-        // Keep as fallback
-        fallbackOrchestrator = agent;
+    try {
+      // First try to find an enhanced orchestrator
+      let orchestrator: BaseAgent | undefined;
+      let fallbackOrchestrator: BaseAgent | undefined;
+      
+      // Convert values iterator to array to avoid TS downlevelIteration issues
+      const agentInstances = Array.from(this.agents.values());
+      console.log(`Found ${agentInstances.length} agent instances`);
+      
+      // First find the enhanced orchestrator if available
+      for (const agent of agentInstances) {
+        if (agent.getType() === 'enhanced_orchestrator' && agent.getConfig().isActive) {
+          console.log(`Found active enhanced orchestrator: ${agent.getName()} (${agent.getId()})`);
+          orchestrator = agent;
+          break;
+        } else if (agent.getType() === 'orchestrator' && agent.getConfig().isActive) {
+          // Keep as fallback
+          console.log(`Found active basic orchestrator as fallback: ${agent.getName()} (${agent.getId()})`);
+          fallbackOrchestrator = agent;
+        }
       }
+      
+      // If no enhanced orchestrator, use the fallback
+      if (!orchestrator && fallbackOrchestrator) {
+        console.log(`Using fallback orchestrator: ${fallbackOrchestrator.getName()} (${fallbackOrchestrator.getId()})`);
+        orchestrator = fallbackOrchestrator;
+      }
+      
+      if (!orchestrator) {
+        console.error('Could not find any active orchestrator agents. Available agents:');
+        for (const agent of agentInstances) {
+          console.log(`- ${agent.getName()} (${agent.getId()}): type=${agent.getType()}, active=${agent.getConfig().isActive}`);
+        }
+        throw new Error('No active orchestrator agent found. Please activate at least one orchestrator agent in the Agents section.');
+      }
+      
+      console.log(`Selected orchestrator ${orchestrator.getName()} (${orchestrator.getId()}) to process message`);
+      
+      // Process message through the selected orchestrator
+      await orchestrator.process(workspaceId, message);
+      console.log(`Message successfully processed by orchestrator ${orchestrator.getName()}`);
+    } catch (error) {
+      console.error(`Error in AgentManager.processMessage:`, error);
+      throw error; // Re-throw for upstream handling
     }
-    
-    // If no enhanced orchestrator, use the fallback
-    if (!orchestrator && fallbackOrchestrator) {
-      orchestrator = fallbackOrchestrator;
-    }
-    
-    if (!orchestrator) {
-      throw new Error('No active orchestrator agent found');
-    }
-    
-    // Process message through the selected orchestrator
-    await orchestrator.process(workspaceId, message);
   }
 }
 
