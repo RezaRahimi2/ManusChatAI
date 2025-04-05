@@ -79,6 +79,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  app.patch('/api/agents/:id', async (req, res) => {
+    try {
+      const agentId = parseInt(req.params.id);
+      console.log(`Patching agent ${agentId} with data:`, JSON.stringify(req.body));
+      
+      const updatedAgent = await agentManager.updateAgent(agentId, req.body);
+      
+      if (!updatedAgent) {
+        console.log(`Agent ${agentId} not found for patch`);
+        return res.status(404).json({ error: 'Agent not found' });
+      }
+      
+      console.log(`Successfully patched agent ${agentId}:`, JSON.stringify(updatedAgent));
+      res.json(updatedAgent);
+    } catch (error) {
+      console.error('Error patching agent:', error);
+      res.status(500).json({ error: 'Failed to patch agent' });
+    }
+  });
+  
   app.delete('/api/agents/:id', async (req, res) => {
     try {
       const agentId = parseInt(req.params.id);

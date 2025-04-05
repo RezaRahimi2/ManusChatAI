@@ -91,7 +91,7 @@ export class MemStorage implements IStorage {
       { provider: 'lmstudio', baseUrl: 'http://localhost:1234/v1', isEnabled: true },
       { provider: 'perplexity', isEnabled: false },
       { provider: 'xai', isEnabled: false },
-      { provider: 'deepseek', isEnabled: false }
+      { provider: 'deepseek', apiKey: 'sk-ba90a58c19e74eb394fe4595f6734785', isEnabled: true }
     ];
     
     for (const provider of defaultProviders) {
@@ -183,7 +183,8 @@ export class MemStorage implements IStorage {
   
   // Message methods
   async getAllMessages(): Promise<Message[]> {
-    return Array.from(this.messages.values());
+    // Convert to array first to avoid downlevelIteration issues
+    return Array.from(this.messages.entries()).map(([_, msg]) => msg);
   }
   
   async getMessageById(id: number): Promise<Message | undefined> {
@@ -191,7 +192,10 @@ export class MemStorage implements IStorage {
   }
   
   async getMessagesByWorkspace(workspaceId: number): Promise<Message[]> {
-    return Array.from(this.messages.values())
+    // Convert to array first to avoid downlevelIteration issues
+    const allMessages = Array.from(this.messages.entries()).map(([_, msg]) => msg);
+    
+    return allMessages
       .filter(message => message.workspaceId === workspaceId)
       .sort((a, b) => a.createdAt - b.createdAt);
   }
@@ -217,7 +221,8 @@ export class MemStorage implements IStorage {
   
   // Tool methods
   async getAllTools(): Promise<Tool[]> {
-    return Array.from(this.tools.values());
+    // Convert to array first to avoid downlevelIteration issues
+    return Array.from(this.tools.entries()).map(([_, tool]) => tool);
   }
   
   async getToolById(id: number): Promise<Tool | undefined> {
@@ -246,7 +251,8 @@ export class MemStorage implements IStorage {
   
   // Memory methods
   async getAllMemories(): Promise<Memory[]> {
-    return Array.from(this.memories.values());
+    // Convert to array first to avoid downlevelIteration issues
+    return Array.from(this.memories.entries()).map(([_, memory]) => memory);
   }
   
   async getMemoryById(id: number): Promise<Memory | undefined> {
@@ -254,9 +260,9 @@ export class MemStorage implements IStorage {
   }
   
   async getMemoryByKey(key: string): Promise<Memory | undefined> {
-    return Array.from(this.memories.values()).find(
-      memory => memory.key === key
-    );
+    // Convert to array first to avoid downlevelIteration issues
+    const memories = Array.from(this.memories.entries()).map(([_, memory]) => memory);
+    return memories.find(memory => memory.key === key);
   }
   
   async createMemory(memory: Omit<Memory, 'id'>): Promise<Memory> {
@@ -271,9 +277,9 @@ export class MemStorage implements IStorage {
   }
   
   async deleteMemoryByKey(key: string): Promise<void> {
-    const memory = Array.from(this.memories.values()).find(
-      memory => memory.key === key
-    );
+    // Convert to array first to avoid downlevelIteration issues
+    const memories = Array.from(this.memories.entries()).map(([_, memory]) => memory);
+    const memory = memories.find(memory => memory.key === key);
     
     if (memory) {
       this.memories.delete(memory.id);
@@ -286,7 +292,8 @@ export class MemStorage implements IStorage {
   }
   
   async getAllLLMProviderSettings(): Promise<LLMProviderSettings[]> {
-    return Array.from(this.llmProviders.values());
+    // Convert to array first to avoid downlevelIteration issues
+    return Array.from(this.llmProviders.entries()).map(([_, provider]) => provider);
   }
   
   async setLLMProviderSettings(settings: LLMProviderSettings): Promise<LLMProviderSettings> {
