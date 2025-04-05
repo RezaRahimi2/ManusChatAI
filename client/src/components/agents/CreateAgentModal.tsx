@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect } from "react";
 import { useAgentContext } from "@/context/AgentContext";
 import { LLMProviderSettings } from "@shared/schema";
+import { Info } from "lucide-react";
 
 interface CreateAgentModalProps {
   onClose: () => void;
@@ -349,31 +350,28 @@ export default function CreateAgentModal({ onClose }: CreateAgentModalProps) {
           
           <div className="grid gap-2">
             <Label htmlFor="llm-model">LLM Model</Label>
-            <Input
-              id="llm-model"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder="Enter model name..."
-              className="w-full"
-            />
-            {availableModels.length > 0 && (
-              <div className="mt-1">
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Suggested models:</p>
-                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pb-1">
-                  {availableModels.map(modelName => (
-                    <button
-                      key={modelName}
-                      onClick={() => setModel(modelName)}
-                      className={`px-2 py-1 text-xs rounded-md ${
-                        model === modelName 
-                          ? 'bg-primary-500 text-white' 
-                          : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-600'
-                      }`}
-                    >
+            <Select value={model} onValueChange={setModel}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableModels.length > 0 ? (
+                  availableModels.map(modelName => (
+                    <SelectItem key={modelName} value={modelName}>
                       {modelName}
-                    </button>
-                  ))}
-                </div>
+                    </SelectItem>
+                  ))
+                ) : (
+                  renderModelOptions()
+                )}
+              </SelectContent>
+            </Select>
+            {availableModels.length > 0 && (
+              <div className="flex items-center mt-1">
+                <Info className="w-4 h-4 mr-1 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">
+                  These models are configured in Settings → LLM Providers
+                </p>
               </div>
             )}
           </div>
