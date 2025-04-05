@@ -95,10 +95,11 @@ export class LLMManager {
     // LiteLLM supported providers that we'll handle differently
     const litellmSupportedProviders = [
       'groq', 'together', 'gemini', 'claude', 'azure', 'replicate',
-      'cohere', 'mistral', 'vertexai', 'bedrock', 'huggingface', 'deepseek'
+      'cohere', 'mistral', 'vertexai', 'bedrock', 'huggingface'
     ];
 
     // Check if this is a LiteLLM-supported provider or the litellm provider itself
+    // Note: deepseek is handled directly and not through LiteLLM
     if (litellmSupportedProviders.includes(provider) || provider === 'litellm') {
       return this.generateWithLiteLLM(provider === 'litellm' ? 'openai' : provider, model, messages, temperature, maxTokens, tools);
     }

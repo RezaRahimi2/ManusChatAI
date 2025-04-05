@@ -32,7 +32,7 @@ export const LITELLM_PROVIDERS = [
   { id: 'azure', name: 'Azure OpenAI', description: 'Microsoft Azure OpenAI models' },
   { id: 'vertexai', name: 'Vertex AI', description: 'Google Cloud Vertex AI models' },
   { id: 'bedrock', name: 'AWS Bedrock', description: 'Amazon Web Services model platform' },
-  { id: 'deepseek', name: 'DeepSeek', description: 'DeepSeek AI large language models' },
+  // Note: DeepSeek is now handled directly via the official API
 ];
 
 /**
@@ -44,7 +44,7 @@ export const DEFAULT_MODELS_FOR_LITELLM_PROVIDERS: Record<string, string[]> = {
   'cohere': ['command', 'command-light', 'command-r', 'command-r-plus'],
   'mistral': ['mistral-small-latest', 'mistral-medium-latest', 'mistral-large-latest'],
   'gemini': ['gemini-1.0-pro', 'gemini-1.5-pro'],
-  'deepseek': ['deepseek-coder', 'deepseek-llm-67b-chat', 'deepseek-llm-7b-chat', 'deepseek-math'],
+  // DeepSeek models are now handled directly via the official API, not through LiteLLM
 };
 
 /**
@@ -137,9 +137,6 @@ export async function testLiteLLMConnection(
           break;
         case 'openai':
           actualBaseUrl = 'https://api.openai.com/v1';
-          break;
-        case 'deepseek':
-          actualBaseUrl = 'https://api.deepseek.com/v1';
           break;
         default:
           return {
