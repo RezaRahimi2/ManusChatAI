@@ -4,7 +4,6 @@ import Markdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
-import type { CodeComponent } from 'react-markdown/lib/ast-to-react';
 
 interface ChatMessageProps {
   message: Message;
@@ -105,13 +104,7 @@ export default function ChatMessage({
           <Markdown
             remarkPlugins={[remarkGfm]}
             components={{
-              code({node, inline, className, children, ...props}: {
-                node?: any;
-                inline?: boolean;
-                className?: string;
-                children: React.ReactNode;
-                [key: string]: any;
-              }) {
+              code({ node, inline, className, children, ...props }: any) {
                 const match = /language-(\w+)/.exec(className || '');
                 return !inline && match ? (
                   <SyntaxHighlighter
@@ -156,13 +149,7 @@ export default function ChatMessage({
                 <Markdown
                   remarkPlugins={[remarkGfm]}
                   components={{
-                    code({node, inline, className, children, ...props}: {
-                      node?: any;
-                      inline?: boolean;
-                      className?: string;
-                      children: React.ReactNode;
-                      [key: string]: any;
-                    }) {
+                    code({ node, inline, className, children, ...props }: any) {
                       const match = /language-(\w+)/.exec(className || '');
                       return !inline && match ? (
                         <SyntaxHighlighter
