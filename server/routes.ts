@@ -243,6 +243,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         defaultModel = 'llama-3.1-sonar-small-128k-online';
       } else if (provider === 'xai') {
         defaultModel = 'grok-2-1212';
+      } else if (provider === 'deepseek') {
+        defaultModel = 'deepseek-chat';
       } else if (providerSettings && providerSettings.models && providerSettings.models.length > 0) {
         // For custom providers, use the first model in their list if available
         defaultModel = providerSettings.models[0];

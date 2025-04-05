@@ -327,9 +327,24 @@ export default function Settings() {
                       requiresKey={false}
                     />
                     
+                    {/* DeepSeek settings */}
+                    <ProviderSettingsCard
+                      initialData={
+                        providers.find(p => p.provider === "deepseek") ||
+                        getDefaultFormState("deepseek")
+                      }
+                      onUpdate={handleProviderUpdate}
+                      onTestConnection={testConnection}
+                      defaultModels={["deepseek-chat", "deepseek-coder", "deepseek-llm-7b-chat"]}
+                      defaultUrl="https://api.deepseek.com/v1"
+                      testingConnection={testConnectionMutation.isPending}
+                      title="DeepSeek AI"
+                      description="Configure DeepSeek API settings"
+                    />
+
                     {/* Custom providers */}
                     {providers
-                      .filter(p => !["openai", "anthropic", "ollama", "lmstudio", "perplexity", "xai", "litellm"].includes(p.provider))
+                      .filter(p => !["openai", "anthropic", "ollama", "lmstudio", "perplexity", "xai", "deepseek", "litellm"].includes(p.provider))
                       .map(provider => (
                         <ProviderSettingsCard
                           key={provider.provider}
@@ -388,9 +403,9 @@ export default function Settings() {
                                     <SelectValue placeholder="Select a provider" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {litellmProviders.map((provider: string) => (
-                                      <SelectItem key={provider} value={provider}>
-                                        {provider}
+                                    {litellmProviders.map((provider: any) => (
+                                      <SelectItem key={provider.id} value={provider.id}>
+                                        {provider.name}
                                       </SelectItem>
                                     ))}
                                   </SelectContent>

@@ -1,0 +1,37 @@
+The above error occurred in the <span> component:
+
+    at span
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-CPFL7ZFD.js?v=a665461e:41:13
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-select.js?v=a665461e:946:13
+    at div
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-CPFL7ZFD.js?v=a665461e:41:13
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=a665461e:52:11
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=a665461e:33:11
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OKX5DAGM.js?v=a665461e:109:15
+    at Provider (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-MQDSU7FK.js?v=a665461e:38:15)
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-select.js?v=a665461e:839:7
+    at _c11 (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/src/components/ui/select.tsx:207:13)
+    at div
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-CPFL7ZFD.js?v=a665461e:41:13
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=a665461e:52:11
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=a665461e:33:11
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OKX5DAGM.js?v=a665461e:98:15
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-select.js?v=a665461e:750:13
+    at div
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=a665461e:52:11
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=a665461e:33:11
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OKX5DAGM.js?v=a665461e:98:15
+    at Provider (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-MQDSU7FK.js?v=a665461e:38:15)
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-select.js?v=a665461e:294:58
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=a665461e:52:11
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=a665461e:33:11
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-CPFL7ZFD.js?v=a665461e:41:13
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-75ER7FHX.js?v=a665461e:258:22
+    at SelectPortal
+    at _c7 (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/src/components/ui/select.tsx:122:12)
+    at Provider (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-MQDSU7FK.js?v=a665461e:38:15)
+    at Provider (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OKX5DAGM.js?v=a665461e:28:15)
+    at CollectionProvider (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OKX5DAGM.js?v=a665461e:89:13)
+    at Provider (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-MQDSU7FK.js?v=a665461e:38:15)
+    at Provider…
+Objects are not valid as a React child (found: object with keys {id, name, description}). If you meant to render a collection of children, use an array instead.
