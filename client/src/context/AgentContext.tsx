@@ -10,6 +10,7 @@ interface AgentContextType {
   updateAgent: (agentData: Agent) => Promise<void>;
   deleteAgent: (agentId: number) => Promise<void>;
   getAgentById: (agentId: number) => Agent | undefined;
+  getAllAgents: () => Agent[];
   loading: boolean;
   error: string | null;
 }
@@ -178,6 +179,10 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const getAgentById = (agentId: number) => {
     return agents.find(agent => agent.id === agentId);
   };
+  
+  const getAllAgents = () => {
+    return agents;
+  };
 
   return (
     <AgentContext.Provider
@@ -189,6 +194,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateAgent,
         deleteAgent,
         getAgentById,
+        getAllAgents,
         loading,
         error
       }}
