@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAgentContext } from "@/context/AgentContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { LLMProviderSettings } from "@shared/schema";
 
 interface AgentDetailsProps {
   onClose: () => void;
@@ -20,6 +21,64 @@ export default function AgentDetails({ onClose }: AgentDetailsProps) {
   const [temperature, setTemperature] = useState(selectedAgent?.temperature ? selectedAgent.temperature / 100 : 0.7);
   const [maxTokens, setMaxTokens] = useState(selectedAgent?.maxTokens || 4000);
   const [selectedTools, setSelectedTools] = useState<string[]>(selectedAgent?.tools || []);
+  const [providerSettings, setProviderSettings] = useState<Record<string, LLMProviderSettings>>({});
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Fetch provider settings and models when component mounts
+  useEffect(() => {
+    const fetchProviderSettings = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch('/api/llm-providers');
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Convert array to provider -> settings map
+          const settingsMap: Record<string, LLMProviderSettings> = {};
+          data.forEach((provider: LLMProviderSettings) => {
+            settingsMap[provider.provider] = provider;
+          });
+          
+          setProviderSettings(settingsMap);
+        }
+      } catch (error) {
+        console.error('Error fetching LLM provider settings:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchProviderSettings();
+  }, []);
+  
+  // Update models when selected agent changes
+  useEffect(() => {
+    if (selectedAgent) {
+      const provider = selectedAgent.provider;
+      
+      // Check if this is a LiteLLM provider
+      if (provider.startsWith('litellm-')) {
+        const actualProvider = provider.replace('litellm-', '');
+        
+        // Fetch models for this LiteLLM provider
+        fetch(`/api/litellm-models/${actualProvider}`)
+          .then(response => response.json())
+          .then(data => {
+            if (data && data.models) {
+              setAvailableModels(data.models);
+            }
+          })
+          .catch(error => console.error(`Error fetching models for ${provider}:`, error));
+      } else if (providerSettings[provider] && providerSettings[provider].models) {
+        // Use models from provider settings
+        setAvailableModels(providerSettings[provider].models || []);
+      } else {
+        // Reset models for built-in providers (will use renderModelOptions defaults)
+        setAvailableModels([]);
+      }
+    }
+  }, [selectedAgent, providerSettings]);
   
   if (!selectedAgent) return null;
 
@@ -58,10 +117,25 @@ export default function AgentDetails({ onClose }: AgentDetailsProps) {
   };
 
   const renderModelOptions = () => {
+    // If we have available models from provider settings or LiteLLM
+    if (availableModels.length > 0) {
+      return (
+        <>
+          {availableModels.map(modelName => (
+            <SelectItem key={modelName} value={modelName}>
+              {modelName}
+            </SelectItem>
+          ))}
+        </>
+      );
+    }
+    
+    // Default built-in providers
     switch (provider) {
       case "openai":
         return (
           <>
+            <SelectItem value="gpt-4o">GPT-4o</SelectItem>
             <SelectItem value="gpt-4">GPT-4</SelectItem>
             <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
           </>
@@ -69,6 +143,7 @@ export default function AgentDetails({ onClose }: AgentDetailsProps) {
       case "anthropic":
         return (
           <>
+            <SelectItem value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet</SelectItem>
             <SelectItem value="claude-3-opus">Claude 3 Opus</SelectItem>
             <SelectItem value="claude-3-sonnet">Claude 3 Sonnet</SelectItem>
             <SelectItem value="claude-3-haiku">Claude 3 Haiku</SelectItem>
@@ -77,6 +152,7 @@ export default function AgentDetails({ onClose }: AgentDetailsProps) {
       case "ollama":
         return (
           <>
+            <SelectItem value="ollama/llama3">Llama 3</SelectItem>
             <SelectItem value="ollama/llama2">Llama 2</SelectItem>
             <SelectItem value="ollama/mistral">Mistral</SelectItem>
             <SelectItem value="ollama/codellama">Code Llama</SelectItem>
@@ -90,7 +166,41 @@ export default function AgentDetails({ onClose }: AgentDetailsProps) {
             <SelectItem value="lmstudio/openchat">OpenChat</SelectItem>
           </>
         );
+      case "perplexity":
+        return (
+          <>
+            <SelectItem value="llama-3.1-sonar-small-128k-online">Llama 3.1 Sonar Small</SelectItem>
+            <SelectItem value="llama-3.1-sonar-large-128k-online">Llama 3.1 Sonar Large</SelectItem>
+            <SelectItem value="llama-3.1-sonar-huge-128k-online">Llama 3.1 Sonar Huge</SelectItem>
+          </>
+        );
+      case "xai":
+        return (
+          <>
+            <SelectItem value="grok-2-1212">Grok 2</SelectItem>
+            <SelectItem value="grok-2-vision-1212">Grok 2 Vision</SelectItem>
+            <SelectItem value="grok-vision-beta">Grok Vision Beta</SelectItem>
+            <SelectItem value="grok-beta">Grok Beta</SelectItem>
+          </>
+        );
+      case "litellm":
+        return (
+          <>
+            <SelectItem value="gpt-4o">GPT-4o (OpenAI)</SelectItem>
+            <SelectItem value="claude-3-7-sonnet-20250219">Claude 3.7 (Anthropic)</SelectItem>
+            <SelectItem value="mistral-large-latest">Mistral Large</SelectItem>
+            <SelectItem value="llama3-70b-8192">Llama 3 70B (Groq)</SelectItem>
+          </>
+        );
       default:
+        // If it's a custom provider with no models set yet
+        if (provider.startsWith('litellm-')) {
+          return (
+            <SelectItem value="default-model">
+              Default model
+            </SelectItem>
+          );
+        }
         return null;
     }
   };

@@ -96,9 +96,9 @@ export class LLMManager {
       'cohere', 'mistral', 'vertexai', 'bedrock', 'huggingface'
     ];
 
-    // Check if this is a LiteLLM-supported provider
-    if (litellmSupportedProviders.includes(provider)) {
-      return this.generateWithLiteLLM(provider, model, messages, temperature, maxTokens, tools);
+    // Check if this is a LiteLLM-supported provider or the litellm provider itself
+    if (litellmSupportedProviders.includes(provider) || provider === 'litellm') {
+      return this.generateWithLiteLLM(provider === 'litellm' ? 'openai' : provider, model, messages, temperature, maxTokens, tools);
     }
     
     // Check if this is a provider added via LiteLLM (prefixed with litellm-)
@@ -108,7 +108,7 @@ export class LLMManager {
         const actualProvider = provider.replace('litellm-', '');
         
         // Get the provider settings to properly set API key and base URL
-        const { storage } = await import('./storage');
+        const { storage } = await import('../storage');
         const providerSettings = await storage.getLLMProviderSettings(provider);
         
         if (providerSettings?.apiKey) {

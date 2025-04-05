@@ -5,8 +5,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAgentContext } from "@/context/AgentContext";
+import { LLMProviderSettings } from "@shared/schema";
 
 interface CreateAgentModalProps {
   onClose: () => void;
@@ -16,12 +17,35 @@ export default function CreateAgentModal({ onClose }: CreateAgentModalProps) {
   const { createAgent } = useAgentContext();
   const [name, setName] = useState("");
   const [type, setType] = useState("research");
-  const [model, setModel] = useState("gpt-4");
+  const [model, setModel] = useState("gpt-4o");
   const [provider, setProvider] = useState("openai");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(4000);
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
+  const [providerSettings, setProviderSettings] = useState<LLMProviderSettings[]>([]);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Fetch provider settings when component mounts
+  useEffect(() => {
+    const fetchProviderSettings = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch('/api/llm-providers');
+        if (response.ok) {
+          const data = await response.json();
+          setProviderSettings(data);
+        }
+      } catch (error) {
+        console.error('Error fetching LLM provider settings:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchProviderSettings();
+  }, []);
 
   const handleSubmit = async () => {
     if (!name.trim()) return;
@@ -50,6 +74,35 @@ export default function CreateAgentModal({ onClose }: CreateAgentModalProps) {
     );
   };
 
+  // Update available models when provider changes
+  useEffect(() => {
+    if (provider.startsWith('litellm-')) {
+      const actualProvider = provider.replace('litellm-', '');
+      
+      // Fetch models for this LiteLLM provider
+      fetch(`/api/litellm-models/${actualProvider}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data && data.models) {
+            setAvailableModels(data.models);
+            if (data.models.length > 0) {
+              setModel(data.models[0]);
+            }
+          }
+        })
+        .catch(error => console.error(`Error fetching models for ${provider}:`, error));
+    } else {
+      // Find the provider in our settings
+      const providerSetting = providerSettings.find(p => p.provider === provider);
+      if (providerSetting && providerSetting.models && providerSetting.models.length > 0) {
+        setAvailableModels(providerSetting.models);
+        setModel(providerSetting.models[0]);
+      } else {
+        setAvailableModels([]);
+      }
+    }
+  }, [provider, providerSettings]);
+
   // When provider changes, update model options
   const handleProviderChange = (value: string) => {
     setProvider(value);
@@ -57,25 +110,49 @@ export default function CreateAgentModal({ onClose }: CreateAgentModalProps) {
     // Set default model for the provider
     switch (value) {
       case "openai":
-        setModel("gpt-4");
+        setModel("gpt-4o");
         break;
       case "anthropic":
-        setModel("claude-3-sonnet");
+        setModel("claude-3-7-sonnet-20250219");
         break;
       case "ollama":
-        setModel("ollama/llama2");
+        setModel("ollama/llama3");
         break;
       case "lmstudio":
         setModel("lmstudio/mistral");
+        break;
+      case "perplexity":
+        setModel("llama-3.1-sonar-small-128k-online");
+        break;
+      case "xai":
+        setModel("grok-2-1212");
+        break;
+      case "litellm":
+        setModel("gpt-4o");
         break;
     }
   };
 
   const renderModelOptions = () => {
+    // If we have available models from provider settings or LiteLLM
+    if (availableModels.length > 0) {
+      return (
+        <>
+          {availableModels.map(modelName => (
+            <SelectItem key={modelName} value={modelName}>
+              {modelName}
+            </SelectItem>
+          ))}
+        </>
+      );
+    }
+    
+    // Default built-in providers
     switch (provider) {
       case "openai":
         return (
           <>
+            <SelectItem value="gpt-4o">GPT-4o</SelectItem>
             <SelectItem value="gpt-4">GPT-4</SelectItem>
             <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
           </>
@@ -83,6 +160,7 @@ export default function CreateAgentModal({ onClose }: CreateAgentModalProps) {
       case "anthropic":
         return (
           <>
+            <SelectItem value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet</SelectItem>
             <SelectItem value="claude-3-opus">Claude 3 Opus</SelectItem>
             <SelectItem value="claude-3-sonnet">Claude 3 Sonnet</SelectItem>
             <SelectItem value="claude-3-haiku">Claude 3 Haiku</SelectItem>
@@ -91,6 +169,7 @@ export default function CreateAgentModal({ onClose }: CreateAgentModalProps) {
       case "ollama":
         return (
           <>
+            <SelectItem value="ollama/llama3">Llama 3</SelectItem>
             <SelectItem value="ollama/llama2">Llama 2</SelectItem>
             <SelectItem value="ollama/mistral">Mistral</SelectItem>
             <SelectItem value="ollama/codellama">Code Llama</SelectItem>
@@ -104,7 +183,41 @@ export default function CreateAgentModal({ onClose }: CreateAgentModalProps) {
             <SelectItem value="lmstudio/openchat">OpenChat</SelectItem>
           </>
         );
+      case "perplexity":
+        return (
+          <>
+            <SelectItem value="llama-3.1-sonar-small-128k-online">Llama 3.1 Sonar Small</SelectItem>
+            <SelectItem value="llama-3.1-sonar-large-128k-online">Llama 3.1 Sonar Large</SelectItem>
+            <SelectItem value="llama-3.1-sonar-huge-128k-online">Llama 3.1 Sonar Huge</SelectItem>
+          </>
+        );
+      case "xai":
+        return (
+          <>
+            <SelectItem value="grok-2-1212">Grok 2</SelectItem>
+            <SelectItem value="grok-2-vision-1212">Grok 2 Vision</SelectItem>
+            <SelectItem value="grok-vision-beta">Grok Vision Beta</SelectItem>
+            <SelectItem value="grok-beta">Grok Beta</SelectItem>
+          </>
+        );
+      case "litellm":
+        return (
+          <>
+            <SelectItem value="gpt-4o">GPT-4o (OpenAI)</SelectItem>
+            <SelectItem value="claude-3-7-sonnet-20250219">Claude 3.7 (Anthropic)</SelectItem>
+            <SelectItem value="mistral-large-latest">Mistral Large</SelectItem>
+            <SelectItem value="llama3-70b-8192">Llama 3 70B (Groq)</SelectItem>
+          </>
+        );
       default:
+        // If it's a custom provider with no models set yet
+        if (provider.startsWith('litellm-')) {
+          return (
+            <SelectItem value="default-model">
+              Default model
+            </SelectItem>
+          );
+        }
         return null;
     }
   };
@@ -153,8 +266,31 @@ export default function CreateAgentModal({ onClose }: CreateAgentModalProps) {
               <SelectContent>
                 <SelectItem value="openai">OpenAI</SelectItem>
                 <SelectItem value="anthropic">Anthropic</SelectItem>
+                <SelectItem value="perplexity">Perplexity</SelectItem>
+                <SelectItem value="xai">X AI (Grok)</SelectItem>
                 <SelectItem value="ollama">Ollama (Local)</SelectItem>
                 <SelectItem value="lmstudio">LM Studio (Local)</SelectItem>
+                <SelectItem value="litellm">LiteLLM</SelectItem>
+                
+                {/* Custom LiteLLM providers */}
+                {providerSettings
+                  .filter(p => p.provider.startsWith('litellm-'))
+                  .map(p => (
+                    <SelectItem key={p.provider} value={p.provider}>
+                      {p.displayName || p.provider.replace('litellm-', '')}
+                    </SelectItem>
+                  ))
+                }
+                
+                {/* Custom OpenAI-compatible providers */}
+                {providerSettings
+                  .filter(p => p.provider.startsWith('custom-') && !p.provider.startsWith('litellm-'))
+                  .map(p => (
+                    <SelectItem key={p.provider} value={p.provider}>
+                      {p.displayName || p.provider.replace('custom-', '')}
+                    </SelectItem>
+                  ))
+                }
               </SelectContent>
             </Select>
           </div>
