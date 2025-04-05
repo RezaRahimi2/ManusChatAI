@@ -194,10 +194,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post('/api/llm-providers', async (req, res) => {
     try {
+      console.log('Received LLM provider settings:', JSON.stringify(req.body, null, 2));
+      
       const { llmProviderSettingsSchema } = await import('@shared/schema');
       const result = llmProviderSettingsSchema.safeParse(req.body);
       
       if (!result.success) {
+        console.error('Validation error:', JSON.stringify(result.error, null, 2));
         return res.status(400).json({ error: 'Invalid LLM provider settings', details: result.error });
       }
       
