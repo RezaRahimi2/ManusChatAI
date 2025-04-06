@@ -494,31 +494,71 @@ export class LLMManager {
       // Set default model if not specified
       const actualModel = model || 'deepseek-chat';
       
-      // DeepSeek API has strict requirements about system messages
-      // Extract all system messages and non-system messages to ensure proper ordering
-      const systemMessages = messages.filter(msg => msg.role === 'system');
-      const nonSystemMessages = messages.filter(msg => msg.role !== 'system');
+      // DeepSeek API has strict requirements for message ordering:
+      // 1. System message must be first (if any)
+      // 2. User and assistant messages must alternate, starting with user
       
       let processedMessages = [];
       
-      // If there are system messages, combine them into one
+      // Extract system messages
+      const systemMessages = messages.filter(msg => msg.role === 'system');
+      
+      // Get non-system messages but we need to ensure proper alternation
+      const nonSystemMessages = messages.filter(msg => msg.role !== 'system');
+      
+      // Add combined system message as the first message if any exist
       if (systemMessages.length > 0) {
         const combinedSystemContent = systemMessages
           .map(msg => msg.content)
           .filter(content => content && content.trim().length > 0)
           .join('\n\n');
         
-        // Create a new messages array with the system message first
-        processedMessages = [
-          { role: 'system', content: combinedSystemContent || 'You are a helpful assistant.' },
-          ...nonSystemMessages
-        ];
+        processedMessages.push({ 
+          role: 'system', 
+          content: combinedSystemContent || 'You are a helpful assistant.' 
+        });
       } else {
-        // If no system message exists, add a default one
-        processedMessages = [
-          { role: 'system', content: 'You are a helpful assistant specialized in reasoning and problem-solving.' },
-          ...nonSystemMessages
-        ];
+        // Add default system message if none exists
+        processedMessages.push({ 
+          role: 'system', 
+          content: 'You are a helpful assistant specialized in reasoning and problem-solving.' 
+        });
+      }
+      
+      // Process non-system messages to ensure they alternate properly (user → assistant → user → etc.)
+      // If two messages of the same role appear consecutively, merge them
+      let currentRole = '';
+      let currentMessage = '';
+      
+      for (const msg of nonSystemMessages) {
+        // If this is a new role or the first message being processed
+        if (msg.role !== currentRole || currentRole === '') {
+          // If we have a previous message to add
+          if (currentMessage) {
+            processedMessages.push({ role: currentRole, content: currentMessage });
+          }
+          
+          // Start a new message
+          currentRole = msg.role;
+          currentMessage = msg.content || '';
+        } else {
+          // Same role as previous, append content
+          currentMessage += '\n\n' + (msg.content || '');
+        }
+      }
+      
+      // Add the final message if any exists
+      if (currentMessage) {
+        processedMessages.push({ role: currentRole, content: currentMessage });
+      }
+      
+      // Ensure the first non-system message is from user
+      if (processedMessages.length > 1 && processedMessages[1].role !== 'user') {
+        // Insert a default user message if needed
+        processedMessages.splice(1, 0, { 
+          role: 'user', 
+          content: 'I need your assistance with the following task.' 
+        });
       }
       
       const response = await axios.post(

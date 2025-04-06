@@ -233,15 +233,18 @@ export default function AgentInteractionFlow({
                   r={4}
                   fill="#3b82f6"
                   filter="url(#glow)"
-                  initial={{ offsetDistance: "0%" }}
-                  animate={{ offsetDistance: "100%" }}
+                  initial={{ 
+                    cx: startX,
+                    cy: startY
+                  }}
+                  animate={{ 
+                    cx: endX,
+                    cy: endY
+                  }}
                   transition={{ 
                     repeat: Infinity, 
                     duration: 1.5,
                     ease: "linear"
-                  }}
-                  style={{
-                    offsetPath: `path('M ${startX} ${startY} Q ${controlX} ${controlY}, ${endX} ${endY}')`,
                   }}
                 />
               )}

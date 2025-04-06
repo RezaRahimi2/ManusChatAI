@@ -1,0 +1,42 @@
+Collaboration step update: 
+Object {type: "collaboration_step_update", workspaceId: 1, collaborationId: "collab_1743917263997_778", stepId: "step_collab_1743917263997_778_0", status: "in_progress", …}
+WebSocket message received: 
+Object {type: "collaboration_step_update", workspaceId: 1, collaborationId: "collab_1743917263997_778", stepId: "step_collab_1743917263997_778_1", status: "in_progress", …}
+Collaboration step update: 
+Object {type: "collaboration_step_update", workspaceId: 1, collaborationId: "collab_1743917263997_778", stepId: "step_collab_1743917263997_778_1", status: "in_progress", …}
+Sent WebSocket message: join_workspace
+Joining workspace: 1
+WebSocket message received: 
+Object {type: "collaboration_step_update", workspaceId: 1, collaborationId: "collab_1743917263997_778", stepId: "step_collab_1743917263997_778_2", status: "in_progress", …}
+Collaboration step update: 
+Object {type: "collaboration_step_update", workspaceId: 1, collaborationId: "collab_1743917263997_778", stepId: "step_collab_1743917263997_778_2", status: "in_progress", …}
+WebSocket message received: 
+Object {type: "collaboration_step_update", workspaceId: 1, collaborationId: "collab_1743917263997_778", stepId: "step_collab_1743917263997_778_3", status: "in_progress", …}
+Collaboration step update: 
+Object {type: "collaboration_step_update", workspaceId: 1, collaborationId: "collab_1743917263997_778", stepId: "step_collab_1743917263997_778_3", status: "in_progress", …}
+WebSocket message received: 
+Object {type: "collaboration_step_update", workspaceId: 1, collaborationId: "collab_1743917263997_778", stepId: "step_collab_1743917263997_778_4", status: "in_progress", …}
+Collaboration step update: 
+Object {type: "collaboration_step_update", workspaceId: 1, collaborationId: "collab_1743917263997_778", stepId: "step_collab_1743917263997_778_4", status: "in_progress", …}
+Warning: React does not recognize the &#x60;offsetDistance&#x60; prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase &#x60;offsetdistance&#x60; instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+    at circle
+    at MotionComponent (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/framer-motion.js?v=073b025a:945:40)
+    at g
+    at svg
+    at div
+    at AgentInteractionFlow (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/src/components/workspace/AgentInteractionFlow.tsx:23:3)
+    at div
+    at div
+    at Workspace (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/src/components/workspace/Workspace.tsx:30:37)
+    at div
+    at div
+    at div
+    at Home (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/src/pages/home.tsx:31:29)
+    at Route (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=073b025a:323:16)
+    at Switch (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=073b025a:379:17)
+    at Router
+    at WorkspaceProvider (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/src/context/WorkspaceContext.tsx:21:37)
+    at AgentProvider (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/src/context/AgentContext.tsx:21:33)
+    at QueryClientProvider (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=073b025a:2805:3)
+    at App
+Sent WebSocket message: join_workspace

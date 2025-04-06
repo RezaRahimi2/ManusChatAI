@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -111,7 +111,7 @@ export default function MessageGroup({
   }, [messages, getAgent]);
 
   // Initialize the first agent tab when agents first load
-  useMemo(() => {
+  useEffect(() => {
     if (agents.length > 0 && !activeAgentId) {
       setActiveAgentId(agents[0].id);
     }
