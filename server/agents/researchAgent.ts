@@ -21,6 +21,12 @@ export class ResearchAgent extends BaseAgent {
 You have access to web search and can browse web pages to extract relevant information.
 You also have access to a local deep research tool that allows you to retrieve contextually relevant information from past agent interactions and stored documents.
 
+IMPORTANT INSTRUCTIONS FOR HANDLING URLs:
+- When you see a URL in a message, ALWAYS use the web_browser tool with the extract_content action to retrieve its content
+- Don't try to guess the content of a URL without using the web_browser tool
+- If a URL access fails, report the error but continue with your best effort to complete the task
+- URLs may lead to documentation, specifications, or information resources that are critical to the task
+
 Provide comprehensive, accurate, and properly cited information. 
 When providing research:
 1. Be thorough and detailed
@@ -39,6 +45,68 @@ When providing research:
     let enhancedUserMessage = userMessage;
     let hasEnhancements = false;
     
+    // Check for URLs in the user message
+    const urls = this.extractUrls(userMessage);
+    if (urls.length > 0) {
+      // Get the web browser tool
+      const webBrowser = this.toolManager.getToolByType('web_browser');
+      
+      if (webBrowser) {
+        console.log(`Research Agent found ${urls.length} URL(s) in message: ${urls.join(', ')}`);
+        
+        const urlContentParts = [];
+        
+        // Process each URL to extract content
+        for (const url of urls) {
+          try {
+            console.log(`Extracting content from URL: ${url}`);
+            
+            // Extract content using web browser tool
+            const contentResult = await webBrowser.execute({
+              action: 'extract_content',
+              url
+            });
+            
+            if (contentResult.success && contentResult.content) {
+              console.log(`Successfully extracted content from URL: ${url}`);
+              // Add the extracted content
+              urlContentParts.push(`
+URL: ${url}
+Title: ${contentResult.title || 'No title'}
+Content:
+${contentResult.content.substring(0, 3000)}${contentResult.content.length > 3000 ? '... [content truncated]' : ''}
+`);
+            } else {
+              console.error(`Failed to extract content from URL: ${url}`, contentResult.error);
+              urlContentParts.push(`
+URL: ${url}
+Error: Unable to extract content - ${contentResult.error || 'Unknown error'}
+`);
+            }
+          } catch (error) {
+            console.error(`Error processing URL: ${url}`, error);
+            urlContentParts.push(`
+URL: ${url}
+Error: Exception occurred - ${error instanceof Error ? error.message : 'Unknown error'}
+`);
+          }
+        }
+        
+        // Add URL content to enhanced message
+        if (urlContentParts.length > 0) {
+          enhancedUserMessage = `
+Original request: ${userMessage}
+
+Extracted content from URLs:
+${urlContentParts.join('\n---\n')}
+
+Based on this extracted content, please analyze and respond to the original request.`;
+          
+          hasEnhancements = true;
+        }
+      }
+    }
+    
     // Get relevant context from the local deep research tool
     const deepResearch = this.toolManager.getToolByType('deep_research');
     if (deepResearch) {
@@ -52,13 +120,16 @@ When providing research:
         });
         
         if (researchContext && researchContext.length > 0) {
-          enhancedUserMessage = `
+          enhancedUserMessage = hasEnhancements 
+            ? `${enhancedUserMessage}\n\nAdditional relevant context from past interactions:\n${researchContext}`
+            : `
 Original request: ${userMessage}
 
 Relevant context from past interactions:
 ${researchContext}
 
 Based on this context and your knowledge, please provide a comprehensive response.`;
+          
           hasEnhancements = true;
         }
       } catch (error) {
@@ -190,5 +261,25 @@ Based on these search results and your knowledge, please provide a comprehensive
       // Fallback to a simple query based on input
       return [userMessage];
     }
+  }
+  
+  /**
+   * Extract URLs from a text string
+   */
+  private extractUrls(text: string): string[] {
+    // Regular expression to match URLs - handles various schemes and formats
+    const urlRegex = /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gi;
+    
+    // Find all matches
+    const matches = text.match(urlRegex) || [];
+    
+    // Filter out duplicate URLs using object keys
+    const uniqueUrls: Record<string, boolean> = {};
+    matches.forEach(url => {
+      uniqueUrls[url] = true;
+    });
+    
+    // Return array of unique URLs
+    return Object.keys(uniqueUrls);
   }
 }

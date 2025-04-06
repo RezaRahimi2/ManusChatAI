@@ -178,14 +178,24 @@ export class LocalDeepResearchTool implements ITool {
       });
       
       if (response.status === 200) {
-        return { 
-          success: true, 
-          results: response.data.results.map((result: any) => ({
-            document: result.document,
-            metadata: result.metadata,
-            score: result.score
-          })) 
-        };
+        // Check if results exist before trying to map them
+        if (response.data && Array.isArray(response.data.results)) {
+          return { 
+            success: true, 
+            results: response.data.results.map((result: any) => ({
+              document: result.document,
+              metadata: result.metadata,
+              score: result.score
+            })) 
+          };
+        } else {
+          // Handle case where results are missing or not an array
+          console.log('Warning: No valid results array in search response', response.data);
+          return {
+            success: true,
+            results: [] // Return empty results array instead of undefined
+          };
+        }
       } else {
         return { 
           success: false, 
@@ -248,13 +258,23 @@ export class LocalDeepResearchTool implements ITool {
       const response = await axios.get(`${this.baseUrl}/collections`);
       
       if (response.status === 200) {
-        return { 
-          success: true, 
-          collections: response.data.collections.map((collection: any) => ({
-            name: collection.name,
-            documentCount: collection.document_count
-          }))
-        };
+        // Check if collections exist before trying to map them
+        if (response.data && Array.isArray(response.data.collections)) {
+          return { 
+            success: true, 
+            collections: response.data.collections.map((collection: any) => ({
+              name: collection.name,
+              documentCount: collection.document_count
+            }))
+          };
+        } else {
+          // Handle case where collections are missing or not an array
+          console.log('Warning: No valid collections array in response', response.data);
+          return {
+            success: true,
+            collections: [] // Return empty collections array instead of undefined
+          };
+        }
       } else {
         return { 
           success: false, 
@@ -300,28 +320,51 @@ export class LocalDeepResearchTool implements ITool {
     workspaceId?: number,
     topK: number = 5
   ): Promise<string> {
-    // Search in the agent_interactions collection
-    const results = await this.semanticSearch(query, 'agent_interactions', topK);
-    
-    if (!results.success || !results.results || results.results.length === 0) {
+    try {
+      // Search in the agent_interactions collection
+      const results = await this.semanticSearch(query, 'agent_interactions', topK);
+      
+      if (!results.success || !results.results || results.results.length === 0) {
+        console.log('No relevant context found or search was unsuccessful');
+        return '';
+      }
+      
+      // If workspace ID is provided, filter by workspace
+      let filteredResults = results.results;
+      if (workspaceId !== undefined) {
+        filteredResults = results.results.filter(result => {
+          try {
+            return result.metadata && result.metadata.workspaceId === workspaceId;
+          } catch (error) {
+            console.warn('Error filtering result by workspaceId:', error);
+            return false;
+          }
+        });
+      }
+      
+      // Handle no results after filtering
+      if (filteredResults.length === 0) {
+        console.log('No results remaining after workspace filtering');
+        return '';
+      }
+      
+      // Format the results into a coherent context summary
+      const contextPieces = filteredResults.map(result => {
+        try {
+          // Include a score indicator (higher score = more relevant)
+          const relevanceIndicator = `[Relevance: ${Math.round((result.score || 0) * 100)}%]`;
+          return `${relevanceIndicator}\n${result.document || 'No content available'}\n`;
+        } catch (error) {
+          console.warn('Error formatting search result:', error);
+          return '[Error formatting result]';
+        }
+      });
+      
+      return contextPieces.join('\n---\n\n');
+    } catch (error) {
+      console.error('Error in retrieveRelevantContext:', error);
+      // Return empty string rather than letting the error propagate
       return '';
     }
-    
-    // If workspace ID is provided, filter by workspace
-    let filteredResults = results.results;
-    if (workspaceId !== undefined) {
-      filteredResults = results.results.filter(
-        result => result.metadata.workspaceId === workspaceId
-      );
-    }
-    
-    // Format the results into a coherent context summary
-    const contextPieces = filteredResults.map(result => {
-      // Include a score indicator (higher score = more relevant)
-      const relevanceIndicator = `[Relevance: ${Math.round(result.score * 100)}%]`;
-      return `${relevanceIndicator}\n${result.document}\n`;
-    });
-    
-    return contextPieces.join('\n---\n\n');
   }
 }

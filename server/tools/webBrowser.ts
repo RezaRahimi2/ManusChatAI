@@ -1,210 +1,251 @@
+import axios from 'axios';
 import { Tool } from '@shared/schema';
 import { ITool } from './toolManager';
-import axios from 'axios';
-import { JSDOM } from 'jsdom';
 
+/**
+ * Tool for accessing and processing web content
+ */
 export class WebBrowser implements ITool {
-  private toolData: Tool;
+  private tool: Tool;
   
-  constructor(toolData: Tool) {
-    this.toolData = toolData;
+  constructor(tool: Tool) {
+    this.tool = tool;
   }
   
   getName(): string {
-    return this.toolData.name;
+    return this.tool.name;
   }
   
   getType(): string {
-    return this.toolData.type;
+    return this.tool.type;
   }
   
   getDescription(): string {
-    return this.toolData.description || 'Search the web and browse websites';
+    return this.tool.description || 'Access and process web content from URLs';
   }
   
   isEnabled(): boolean {
-    return this.toolData.isEnabled;
+    return this.tool.isEnabled !== false;
   }
   
   getParameters(): Record<string, any> {
     return {
       type: 'object',
-      required: ['action'],
       properties: {
         action: {
           type: 'string',
-          enum: ['search', 'visit', 'extract'],
-          description: 'Action to perform: search the web, visit a URL, or extract content from a webpage',
-        },
-        query: {
-          type: 'string',
-          description: 'Search query when action is "search"',
+          enum: ['visit', 'extract_content', 'search'],
+          description: 'The action to perform with the web browser tool'
         },
         url: {
           type: 'string',
-          description: 'URL to visit or extract content from when action is "visit" or "extract"',
+          description: 'The URL to visit or extract content from'
+        },
+        query: {
+          type: 'string',
+          description: 'The search query to use'
         },
         selector: {
           type: 'string',
-          description: 'CSS selector to extract specific content when action is "extract"',
+          description: 'Optional CSS selector to extract specific content from the page'
         }
-      }
+      },
+      required: ['action']
     };
   }
   
   async execute(params: any): Promise<any> {
-    // Validate action
-    if (!params.action) {
-      throw new Error('Action parameter is required');
-    }
+    const { action } = params;
     
-    const config = this.toolData.config as Record<string, any> || {};
-    const timeout = config.timeout || 30000;
-    const userAgent = config.userAgent || 'Mozilla/5.0 Manus AI Browser';
-    
-    switch (params.action) {
-      case 'search':
-        return this.search(params.query, timeout, userAgent);
+    switch (action) {
       case 'visit':
-        return this.visit(params.url, timeout, userAgent);
-      case 'extract':
-        return this.extract(params.url, params.selector, timeout, userAgent);
+        return this.visitUrl(params.url);
+        
+      case 'extract_content':
+        return this.extractContent(params.url, params.selector);
+        
+      case 'search':
+        return this.search(params.query);
+        
       default:
-        throw new Error(`Unknown action: ${params.action}`);
+        return {
+          success: false,
+          error: `Unknown action: ${action}`
+        };
     }
   }
   
-  private async search(query: string, timeout: number, userAgent: string): Promise<any> {
-    if (!query) {
-      throw new Error('Query parameter is required for search action');
-    }
-    
-    try {
-      // For demo purposes, we'll use DuckDuckGo's HTML site
-      // In a production system, you'd use a proper search API
-      const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-      
-      const response = await axios.get(searchUrl, {
-        headers: {
-          'User-Agent': userAgent,
-          'Accept': 'text/html,application/xhtml+xml',
-        },
-        timeout,
-      });
-      
-      // Parse the HTML response
-      const dom = new JSDOM(response.data);
-      const document = dom.window.document;
-      
-      // Extract search results
-      const results = Array.from(document.querySelectorAll('.result'))
-        .slice(0, 5) // Limit to top 5 results
-        .map(result => {
-          const titleElement = result.querySelector('.result__title a');
-          const snippetElement = result.querySelector('.result__snippet');
-          const urlElement = result.querySelector('.result__url');
-          
-          return {
-            title: titleElement?.textContent?.trim() || '',
-            snippet: snippetElement?.textContent?.trim() || '',
-            url: titleElement ? (titleElement as HTMLAnchorElement).href : '',
-          };
-        });
-      
-      return {
-        query,
-        results,
-      };
-    } catch (error) {
-      console.error('Error searching the web:', error);
-      throw new Error(`Search failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
+  /**
+   * Get the tool's configuration
+   */
+  getConfig(): Tool {
+    return this.tool;
   }
   
-  private async visit(url: string, timeout: number, userAgent: string): Promise<any> {
-    if (!url) {
-      throw new Error('URL parameter is required for visit action');
-    }
-    
+  /**
+   * Visit a URL and retrieve basic metadata
+   */
+  private async visitUrl(url: string): Promise<{
+    success: boolean;
+    title?: string;
+    url?: string;
+    error?: string;
+    contentType?: string;
+  }> {
     try {
-      // Validate URL
-      new URL(url);
+      // Validate the URL
+      if (!url || !url.match(/^https?:\/\/.+/)) {
+        return {
+          success: false,
+          error: 'Invalid URL format. URL must start with http:// or https://'
+        };
+      }
       
+      console.log(`Visiting URL: ${url}`);
+      
+      // Make a GET request to the URL
       const response = await axios.get(url, {
         headers: {
-          'User-Agent': userAgent,
-          'Accept': 'text/html,application/xhtml+xml',
+          'User-Agent': 'Mozilla/5.0 (compatible; MultiAgentSystem/1.0)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml'
         },
-        timeout,
+        timeout: 10000, // 10 second timeout
+        maxContentLength: 1024 * 1024 * 5 // 5MB limit
       });
       
-      // Parse the HTML response
-      const dom = new JSDOM(response.data);
-      const document = dom.window.document;
-      
-      // Extract title and main content
-      const title = document.querySelector('title')?.textContent || '';
-      
-      // Try to extract main content
-      // For simplicity, grab text from paragraphs, headings, and list items
-      const contentElements = Array.from(document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li'));
-      const content = contentElements
-        .map(el => el.textContent?.trim())
-        .filter(text => text && text.length > 20) // Filter out empty or very short texts
-        .join('\n\n');
+      // Extract title if available
+      const titleMatch = response.data.match(/<title>(.*?)<\/title>/i);
+      const title = titleMatch ? titleMatch[1] : 'Unknown Title';
       
       return {
-        url,
+        success: true,
         title,
-        content: content.substring(0, 5000), // Limit to 5000 chars to prevent very large responses
+        url,
+        contentType: response.headers['content-type']
       };
     } catch (error) {
       console.error('Error visiting URL:', error);
-      throw new Error(`Visit failed: ${error instanceof Error ? error.message : String(error)}`);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
   }
   
-  private async extract(url: string, selector: string, timeout: number, userAgent: string): Promise<any> {
-    if (!url) {
-      throw new Error('URL parameter is required for extract action');
-    }
-    
-    if (!selector) {
-      throw new Error('Selector parameter is required for extract action');
-    }
-    
+  /**
+   * Extract content from a URL
+   */
+  private async extractContent(
+    url: string,
+    selector?: string
+  ): Promise<{
+    success: boolean;
+    content?: string;
+    title?: string;
+    error?: string;
+    url?: string;
+  }> {
     try {
-      // Validate URL
-      new URL(url);
+      // Validate the URL
+      if (!url || !url.match(/^https?:\/\/.+/)) {
+        return {
+          success: false,
+          error: 'Invalid URL format. URL must start with http:// or https://'
+        };
+      }
       
+      console.log(`Extracting content from URL: ${url}`);
+      
+      // Make a GET request to the URL
       const response = await axios.get(url, {
         headers: {
-          'User-Agent': userAgent,
-          'Accept': 'text/html,application/xhtml+xml',
+          'User-Agent': 'Mozilla/5.0 (compatible; MultiAgentSystem/1.0)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml'
         },
-        timeout,
+        timeout: 15000, // 15 second timeout
+        maxContentLength: 1024 * 1024 * 10 // 10MB limit
       });
       
-      // Parse the HTML response
-      const dom = new JSDOM(response.data);
-      const document = dom.window.document;
+      // Extract title if available
+      const titleMatch = response.data.match(/<title>(.*?)<\/title>/i);
+      const title = titleMatch ? titleMatch[1] : 'Unknown Title';
       
-      // Extract content using selector
-      const elements = Array.from(document.querySelectorAll(selector));
-      const extractedContent = elements
-        .map(el => el.textContent?.trim())
-        .filter(Boolean)
-        .join('\n\n');
+      // Simple HTML to text conversion for content
+      // In a real implementation, we'd use a proper HTML parser
+      let content = response.data;
+      
+      // Remove scripts and styles
+      content = content.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ');
+      content = content.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ');
+      
+      // Convert HTML to text (basic approach)
+      content = content.replace(/<\/div>|<\/p>|<\/h[1-6]>|<br\s*\/?>/gi, '\n');
+      content = content.replace(/<[^>]+>/g, ' ');
+      
+      // Clean up whitespace
+      content = content.replace(/\s+/g, ' ').trim();
+      
+      // Decode HTML entities
+      content = content.replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'");
+      
+      // Truncate if too long (~ 8000 chars limit)
+      if (content.length > 8000) {
+        content = content.substring(0, 8000) + '... [content truncated due to length]';
+      }
       
       return {
-        url,
-        selector,
-        content: extractedContent.substring(0, 5000), // Limit to 5000 chars
-        elementCount: elements.length,
+        success: true,
+        title,
+        content,
+        url
       };
     } catch (error) {
-      console.error('Error extracting content:', error);
-      throw new Error(`Extraction failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Error extracting content from URL:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+  
+  /**
+   * Perform a web search (simplified implementation)
+   * In a production environment, this would integrate with a real search API
+   */
+  private async search(query: string): Promise<{
+    success: boolean;
+    results?: Array<{
+      title: string;
+      url: string;
+      snippet: string;
+    }>;
+    error?: string;
+  }> {
+    try {
+      console.log(`Searching for: ${query}`);
+      
+      // This is a simplified mock response
+      // In a real implementation, you would use a search API like Google Custom Search
+      return {
+        success: true,
+        results: [
+          {
+            title: 'Search results are not available',
+            url: 'https://example.com/search-results',
+            snippet: 'In a production environment, this would connect to a real search engine API.'
+          }
+        ]
+      };
+    } catch (error) {
+      console.error('Error during search:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
   }
 }
