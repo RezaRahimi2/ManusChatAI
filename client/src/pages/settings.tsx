@@ -671,6 +671,10 @@ function ProviderSettingsCard({
   const handleResetUrl = () => {
     handleInputChange('baseUrl', defaultUrl);
   };
+  
+  const handleResetModels = () => {
+    handleInputChange('models', [...defaultModels]);
+  };
 
   return (
     <Card className="w-full">
@@ -720,7 +724,16 @@ function ProviderSettingsCard({
         </div>
 
         <div className="space-y-2">
-          <Label>Models</Label>
+          <div className="flex justify-between items-center">
+            <Label>Models</Label>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleResetModels}
+            >
+              Reset to Defaults
+            </Button>
+          </div>
           <div className="flex gap-2">
             <Input
               placeholder="Add model name"
