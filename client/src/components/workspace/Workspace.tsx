@@ -4,7 +4,7 @@ import ChatInput from "@/components/chat/ChatInput";
 import ChatMessage from "@/components/chat/ChatMessage";
 import ThinkingMessage from "@/components/chat/ThinkingMessage";
 import MessageGroup from "@/components/chat/MessageGroup";
-import AgentTimeline from "@/components/workspace/AgentTimeline";
+import { AgentTimeline, TimelineDetailView } from "@/components/workspace";
 import AgentInteractionFlow from "@/components/workspace/AgentInteractionFlow";
 import CollaborationControls from "@/components/workspace/CollaborationControls";
 import { useSocket, addMessageListener, removeMessageListener, sendChatMessage, joinWorkspace } from "@/lib/socket";
@@ -28,6 +28,13 @@ export default function Workspace({ workspaceId }: WorkspaceProps) {
   const [activeAgents, setActiveAgents] = useState<Map<number, AgentStatus>>(new Map());
   const [currentCollaboration, setCurrentCollaboration] = useState<string | undefined>();
   const [showTechnicalView, setShowTechnicalView] = useState(false);
+  const [showTimelineDetail, setShowTimelineDetail] = useState(false);
+  const [timelineEvents, setTimelineEvents] = useState<Array<{
+    agent: Agent;
+    timestamp: Date;
+    status: 'waiting' | 'thinking' | 'completed' | 'error' | 'active';
+    message?: string;
+  }>>([]);
   const { toast } = useToast();
   
   // Fetch messages for this workspace
@@ -287,9 +294,98 @@ export default function Workspace({ workspaceId }: WorkspaceProps) {
     // In a real implementation, we would send this to the server
     // sendCollaborationConfig(workspaceId, config);
   };
+  
+  // Handler to show timeline details
+  const showTimelineDetails = () => {
+    // Generate timeline events from messages and active agents
+    const events: Array<{
+      agent: Agent;
+      timestamp: Date;
+      status: 'waiting' | 'thinking' | 'completed' | 'error' | 'active';
+      message?: string;
+    }> = [];
+    
+    // Add events from messages
+    messages.forEach(message => {
+      if (!message.agentId) return;
+      
+      // Find corresponding agent
+      const agent = getAgentById(message.agentId);
+      if (!agent) return;
+      
+      // Determine status based on message metadata
+      let status: 'waiting' | 'thinking' | 'completed' | 'error' | 'active' = 'completed';
+      if (message.metadata) {
+        const metadata = message.metadata as any;
+        if (metadata.type === 'thinking') {
+          status = 'thinking';
+        } else if (metadata.type === 'error') {
+          status = 'error';
+        }
+      }
+      
+      events.push({
+        agent,
+        timestamp: new Date(message.createdAt),
+        status,
+        message: message.content
+      });
+    });
+    
+    // Add events from active agents
+    Array.from(activeAgents.entries()).forEach(([id, status]) => {
+      const agent = getAgentById(id);
+      if (!agent) return;
+      
+      // Map status string to timeline status
+      let timelineStatus: 'waiting' | 'thinking' | 'completed' | 'error' | 'active' = 'waiting';
+      if (status === AgentStatus.PROCESSING) {
+        timelineStatus = 'active';
+      } else if (status === AgentStatus.COMPLETED) {
+        timelineStatus = 'completed';
+      } else if (status === AgentStatus.ERROR) {
+        timelineStatus = 'error';
+      }
+      
+      // Only add if not already represented in messages
+      const agentEvents = events.filter(e => e.agent.id === id);
+      if (agentEvents.length === 0 || timelineStatus !== 'waiting') {
+        events.push({
+          agent,
+          timestamp: new Date(),
+          status: timelineStatus
+        });
+      }
+    });
+    
+    // Sort events by timestamp, most recent first for the view
+    events.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    
+    // Set timeline events and show the detail view
+    setTimelineEvents(events);
+    setShowTimelineDetail(true);
+  };
+  
+  // Close timeline detail view
+  const closeTimelineDetail = () => {
+    setShowTimelineDetail(false);
+  };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Timeline Detail View Modal */}
+      {showTimelineDetail && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center overflow-auto p-4">
+          <TimelineDetailView 
+            events={timelineEvents}
+            agents={getAllAgents()}
+            messages={messages}
+            onClose={closeTimelineDetail}
+            className="max-h-[90vh] overflow-hidden"
+          />
+        </div>
+      )}
+      
       {/* Active Agents Timeline - Only show when agents are active */}
       {activeAgents.size > 0 && (
         <div className="border-b border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
@@ -300,7 +396,7 @@ export default function Workspace({ workspaceId }: WorkspaceProps) {
                 agent: getAgentById(id) as Agent,
                 status
               }))}
-            onShowDetails={toggleControls}
+            onShowDetails={showTimelineDetails}
           />
           
           {/* Add interactive agent flow visualizer for active collaborations */}
