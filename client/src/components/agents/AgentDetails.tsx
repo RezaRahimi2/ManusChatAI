@@ -157,100 +157,59 @@ export default function AgentDetails({ onClose }: AgentDetailsProps) {
   };
 
   const renderModelOptions = () => {
-    // If we have available models from provider settings or LiteLLM
-    if (availableModels.length > 0) {
-      return (
-        <>
-          {availableModels.map(modelName => (
-            <SelectItem key={modelName} value={modelName}>
-              {modelName}
-            </SelectItem>
-          ))}
-        </>
-      );
+    // Get the appropriate default models based on provider
+    const getDefaultModels = () => {
+      switch (provider) {
+        case "openai":
+          return ["gpt-4o", "gpt-4", "gpt-3.5-turbo"];
+        case "anthropic":
+          return ["claude-3-7-sonnet-20250219", "claude-3-opus", "claude-3-sonnet", "claude-3-haiku"];
+        case "ollama":
+          return ["ollama/llama3", "ollama/llama2", "ollama/mistral", "ollama/codellama"];
+        case "lmstudio":
+          return ["lmstudio/mistral", "lmstudio/llama2", "lmstudio/openchat"];
+        case "perplexity":
+          return ["llama-3.1-sonar-small-128k-online", "llama-3.1-sonar-large-128k-online", "llama-3.1-sonar-huge-128k-online"];
+        case "xai":
+          return ["grok-2-1212", "grok-2-vision-1212", "grok-vision-beta", "grok-beta"];
+        case "deepseek":
+          return ["deepseek-chat", "deepseek-coder", "deepseek-llm-7b-chat"];
+        case "litellm":
+          return ["gpt-4o", "claude-3-7-sonnet-20250219", "mistral-large-latest", "llama3-70b-8192"];
+        default:
+          return provider.startsWith('litellm-') ? ["default-model"] : [];
+      }
+    };
+    
+    // Combine default models with any custom models from provider settings
+    const defaultModels = getDefaultModels();
+    let combinedModels = [...defaultModels];
+    
+    // Add models from provider settings if they're not already in the defaults
+    if (providerSettings[provider] && providerSettings[provider].models) {
+      const settingsModels = providerSettings[provider].models || [];
+      settingsModels.forEach(model => {
+        if (!combinedModels.includes(model)) {
+          combinedModels.push(model);
+        }
+      });
     }
     
-    // Default built-in providers
-    switch (provider) {
-      case "openai":
-        return (
-          <>
-            <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-            <SelectItem value="gpt-4">GPT-4</SelectItem>
-            <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
-          </>
-        );
-      case "anthropic":
-        return (
-          <>
-            <SelectItem value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet</SelectItem>
-            <SelectItem value="claude-3-opus">Claude 3 Opus</SelectItem>
-            <SelectItem value="claude-3-sonnet">Claude 3 Sonnet</SelectItem>
-            <SelectItem value="claude-3-haiku">Claude 3 Haiku</SelectItem>
-          </>
-        );
-      case "ollama":
-        return (
-          <>
-            <SelectItem value="ollama/llama3">Llama 3</SelectItem>
-            <SelectItem value="ollama/llama2">Llama 2</SelectItem>
-            <SelectItem value="ollama/mistral">Mistral</SelectItem>
-            <SelectItem value="ollama/codellama">Code Llama</SelectItem>
-          </>
-        );
-      case "lmstudio":
-        return (
-          <>
-            <SelectItem value="lmstudio/mistral">Mistral</SelectItem>
-            <SelectItem value="lmstudio/llama2">Llama 2</SelectItem>
-            <SelectItem value="lmstudio/openchat">OpenChat</SelectItem>
-          </>
-        );
-      case "perplexity":
-        return (
-          <>
-            <SelectItem value="llama-3.1-sonar-small-128k-online">Llama 3.1 Sonar Small</SelectItem>
-            <SelectItem value="llama-3.1-sonar-large-128k-online">Llama 3.1 Sonar Large</SelectItem>
-            <SelectItem value="llama-3.1-sonar-huge-128k-online">Llama 3.1 Sonar Huge</SelectItem>
-          </>
-        );
-      case "xai":
-        return (
-          <>
-            <SelectItem value="grok-2-1212">Grok 2</SelectItem>
-            <SelectItem value="grok-2-vision-1212">Grok 2 Vision</SelectItem>
-            <SelectItem value="grok-vision-beta">Grok Vision Beta</SelectItem>
-            <SelectItem value="grok-beta">Grok Beta</SelectItem>
-          </>
-        );
-      case "deepseek":
-        return (
-          <>
-            <SelectItem value="deepseek-chat">DeepSeek Chat</SelectItem>
-            <SelectItem value="deepseek-coder">DeepSeek Coder</SelectItem>
-            <SelectItem value="deepseek-llm-7b-chat">DeepSeek LLM 7B Chat</SelectItem>
-          </>
-        );
-      case "litellm":
-        return (
-          <>
-            <SelectItem value="gpt-4o">GPT-4o (OpenAI)</SelectItem>
-            <SelectItem value="claude-3-7-sonnet-20250219">Claude 3.7 (Anthropic)</SelectItem>
-            <SelectItem value="mistral-large-latest">Mistral Large</SelectItem>
-            <SelectItem value="llama3-70b-8192">Llama 3 70B (Groq)</SelectItem>
-          </>
-        );
-      default:
-        // If it's a custom provider with no models set yet
-        if (provider.startsWith('litellm-')) {
-          return (
-            <SelectItem value="default-model">
-              Default model
-            </SelectItem>
-          );
-        }
-        return null;
+    // If this is a LiteLLM provider, use availableModels instead
+    if (provider.startsWith('litellm-') && availableModels.length > 0) {
+      combinedModels = availableModels;
     }
+    
+    // Generate the SelectItem components
+    return (
+      <>
+        {combinedModels.map(modelName => (
+          <SelectItem key={modelName} value={modelName}>
+            {modelName}
+          </SelectItem>
+        ))}
+      </>
+    );
   };
 
   // Agent icon color based on type
@@ -384,25 +343,15 @@ export default function AgentDetails({ onClose }: AgentDetailsProps) {
                 <SelectValue placeholder="Select model" />
               </SelectTrigger>
               <SelectContent>
-                {availableModels.length > 0 ? (
-                  availableModels.map(modelName => (
-                    <SelectItem key={modelName} value={modelName}>
-                      {modelName}
-                    </SelectItem>
-                  ))
-                ) : (
-                  renderModelOptions()
-                )}
+                {renderModelOptions()}
               </SelectContent>
             </Select>
-            {availableModels.length > 0 && (
-              <div className="flex items-center mt-1">
-                <span className="material-icons text-neutral-500 text-xs mr-1">info</span>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                  These models are configured in Settings → LLM Providers
-                </p>
-              </div>
-            )}
+            <div className="flex items-center mt-1">
+              <span className="material-icons text-neutral-500 text-xs mr-1">info</span>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                Models include both defaults and those configured in Settings
+              </p>
+            </div>
           </div>
           
           <div className="mt-4">
