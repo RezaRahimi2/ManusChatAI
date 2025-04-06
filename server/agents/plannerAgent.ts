@@ -103,12 +103,13 @@ Format your response in this structured way:
 Remember to be thorough but concise, ensuring the plan is comprehensive yet easy to follow.
 `;
     
-    // Prepare messages for LLM
+    // Prepare messages for LLM - combine system prompts to avoid multiple system messages
+    // This is needed especially for DeepSeek models which require system message to be the first message
+    const combinedSystemPrompt = `${systemPrompt}\n\n${planningPrompt}`;
     const messages = [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: combinedSystemPrompt },
       ...contextMessages,
-      { role: 'user', content: userMessage },
-      { role: 'system', content: planningPrompt }
+      { role: 'user', content: userMessage }
     ];
     
     // Generate response from LLM
@@ -196,14 +197,19 @@ I'll help you execute this plan. Here's how we should proceed:
 
 `;
     
-    // Prepare messages for LLM
+    // Prepare messages for LLM - combine system prompts
+    const systemPrompt = await this.getSystemPrompt();
+    const executionSystemPrompt = `You are now in execution guidance mode. Provide specific 
+guidance for executing the plan below. Focus on actionable advice for each step, tool recommendations, 
+and how to overcome potential challenges. Be concrete and specific.`;
+    
+    // Combine system prompts for DeepSeek compatibility
+    const combinedSystemPrompt = `${systemPrompt}\n\n${executionSystemPrompt}`;
+    
     const messages = [
-      { role: 'system', content: await this.getSystemPrompt() },
+      { role: 'system', content: combinedSystemPrompt },
       ...contextMessages,
       { role: 'user', content: userMessage },
-      { role: 'system', content: `You are now in execution guidance mode. Provide specific 
-guidance for executing the plan below. Focus on actionable advice for each step, tool recommendations, 
-and how to overcome potential challenges. Be concrete and specific.` },
       { role: 'assistant', content: executionPrompt }
     ];
     

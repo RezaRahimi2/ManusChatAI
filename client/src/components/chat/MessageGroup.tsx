@@ -37,6 +37,7 @@ export default function MessageGroup({
 }: MessageGroupProps) {
   const [expanded, setExpanded] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('unified');
+  const [agentTabId, setAgentTabId] = useState<string | null>(null);
   
   // Group and organize messages
   const {
@@ -104,6 +105,13 @@ export default function MessageGroup({
       agents: uniqueAgents
     };
   }, [messages, getAgent]);
+
+  // Initialize the first agent tab when agents first load
+  useMemo(() => {
+    if (agents.length > 0 && !agentTabId) {
+      setAgentTabId(agents[0].id.toString());
+    }
+  }, [agents, agentTabId]);
   
   // Format time for display
   const formatTime = (timestamp: Date | number | string): string => {
@@ -177,146 +185,157 @@ export default function MessageGroup({
                       </TabsTrigger>
                     )}
                   </TabsList>
-                </Tabs>
-              </div>
-              
-              {/* Unified view */}
-              <TabsContent value="unified" className="p-4 space-y-4">
-                {/* Combine all agent messages into a unified response */}
-                {agentMessages
-                  .filter(msg => !(typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking'))
-                  .map((message, index) => {
-                    const agent = getAgent?.(message.agentId || 0);
-                    return (
-                      <div key={message.id || index} className="space-y-2">
-                        {agent && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium">{agent.name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatTime(message.createdAt)}
-                            </span>
-                          </div>
-                        )}
-                        <div className="text-sm">
-                          <Markdown>{message.content}</Markdown>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </TabsContent>
-              
-              {/* Agent view */}
-              <TabsContent value="agents" className="p-0">
-                {agents.length > 0 && (
-                  <Tabs defaultValue={agents[0]?.id.toString() || "0"}>
-                    <TabsList className="w-full justify-start p-2 overflow-x-auto flex-nowrap h-auto bg-muted/50">
-                      {agents.map(agent => (
-                        <TabsTrigger 
-                          key={agent.id} 
-                          value={agent.id.toString()}
-                          className="text-xs whitespace-nowrap"
-                        >
-                          {agent.name}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
-                    
-                    {agents.map(agent => (
-                      <TabsContent key={agent.id} value={agent.id.toString()} className="p-4 space-y-4">
-                        {agentMessages
-                          .filter(msg => msg.agentId === agent.id && !(typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking'))
-                          .map((message, index) => (
-                            <div key={message.id || index} className="space-y-2">
+                
+                  {/* Unified view */}
+                  <TabsContent value="unified" className="p-4 space-y-4">
+                    {/* Combine all agent messages into a unified response */}
+                    {agentMessages
+                      .filter(msg => !(typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking'))
+                      .map((message, index) => {
+                        const agent = getAgent?.(message.agentId || 0);
+                        return (
+                          <div key={message.id || index} className="space-y-2">
+                            {agent && (
                               <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium">{agent.name}</span>
                                 <span className="text-xs text-muted-foreground">
                                   {formatTime(message.createdAt)}
                                 </span>
                               </div>
-                              <div className="text-sm">
-                                <Markdown>{message.content}</Markdown>
-                              </div>
-                            </div>
-                          ))}
-                          
-                        {/* Show thinking if available */}
-                        {agentMessages
-                          .filter(msg => msg.agentId === agent.id && typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking')
-                          .map((message, index) => (
-                            <div key={`thinking-${message.id || index}`} className="mt-4 p-3 bg-muted/50 rounded border text-sm">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="text-xs font-medium">Reasoning Process</span>
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                <Markdown>{message.content}</Markdown>
-                              </div>
-                            </div>
-                          ))}
-                      </TabsContent>
-                    ))}
-                  </Tabs>
-                )}
-                {agents.length === 0 && (
-                  <div className="p-4 text-sm text-muted-foreground">
-                    No agent messages to display
-                  </div>
-                )}
-              </TabsContent>
-              
-              {/* Timeline view */}
-              <TabsContent value="timeline" className="p-0">
-                <div className="p-2">
-                  <div className="space-y-0">
-                    {timelineSteps.map((step, index) => {
-                      const agent = getAgent?.(step.agentId);
-                      
-                      return (
-                        <div key={step.id} className="relative pl-6 ml-3 pb-4 pt-1 border-l">
-                          {/* Timeline dot */}
-                          <div 
-                            className={cn(
-                              "absolute left-[-4px] top-2 w-2 h-2 rounded-full",
-                              step.status === 'thinking' ? 'bg-blue-500' :
-                              step.status === 'completed' ? 'bg-green-500' :
-                              step.status === 'error' ? 'bg-red-500' :
-                              'bg-neutral-400'
                             )}
-                          />
-                          
-                          {/* Step details */}
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="font-medium">
-                                {agent?.name || `Agent #${step.agentId}`}
-                              </span>
-                              <span className="text-muted-foreground text-xs">
-                                {formatTime(step.timestamp)}
-                              </span>
-                            </div>
-                            <div className={cn(
-                              "text-xs p-2 rounded",
-                              step.status === 'thinking' ? 'bg-blue-50 dark:bg-blue-950/30' :
-                              step.status === 'completed' ? 'bg-neutral-50 dark:bg-neutral-900/30' :
-                              step.status === 'error' ? 'bg-red-50 dark:bg-red-950/30' :
-                              'bg-neutral-50 dark:bg-neutral-900/30'
-                            )}>
-                              <Markdown>{step.content}</Markdown>
+                            <div className="text-sm">
+                              <Markdown>{message.content}</Markdown>
                             </div>
                           </div>
+                        );
+                      })}
+                  </TabsContent>
+                  
+                  {/* Agent view */}
+                  <TabsContent value="agents" className="p-0">
+                    {agents.length > 0 && (
+                      <div className="agent-tabs">
+                        {/* Agent selector */}
+                        <div className="w-full bg-muted/50 p-2 flex overflow-x-auto flex-nowrap">
+                          {agents.map((agent) => (
+                            <button
+                              key={agent.id}
+                              onClick={() => setAgentTabId(agent.id.toString())}
+                              className={`text-xs whitespace-nowrap px-3 py-1.5 rounded-md transition-colors ${
+                                agentTabId === agent.id.toString()
+                                  ? 'bg-background text-foreground shadow-sm' 
+                                  : 'text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              {agent.name}
+                            </button>
+                          ))}
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </TabsContent>
-              
-              {/* Technical view for debugging */}
-              {showTechnicalView && (
-                <TabsContent value="technical" className="p-4">
-                  <pre className="bg-neutral-950 text-neutral-50 p-3 rounded text-xs overflow-auto">
-                    {JSON.stringify(messages, null, 2)}
-                  </pre>
-                </TabsContent>
-              )}
+                        
+                        {/* Agent content */}
+                        <div className="p-4">
+                          {agents.map(agent => (
+                            <div 
+                              key={agent.id} 
+                              className={`space-y-4 ${agentTabId === agent.id.toString() ? 'block' : 'hidden'}`}
+                            >
+                              {agentMessages
+                                .filter(msg => msg.agentId === agent.id && !(typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking'))
+                                .map((message, index) => (
+                                  <div key={message.id || index} className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-muted-foreground">
+                                        {formatTime(message.createdAt)}
+                                      </span>
+                                    </div>
+                                    <div className="text-sm">
+                                      <Markdown>{message.content}</Markdown>
+                                    </div>
+                                  </div>
+                                ))}
+                                
+                              {/* Show thinking if available */}
+                              {agentMessages
+                                .filter(msg => msg.agentId === agent.id && typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking')
+                                .map((message, index) => (
+                                  <div key={`thinking-${message.id || index}`} className="mt-4 p-3 bg-muted/50 rounded border text-sm">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span className="text-xs font-medium">Reasoning Process</span>
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      <Markdown>{message.content}</Markdown>
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {agents.length === 0 && (
+                      <div className="p-4 text-sm text-muted-foreground">
+                        No agent messages to display
+                      </div>
+                    )}
+                  </TabsContent>
+                  
+                  {/* Timeline view */}
+                  <TabsContent value="timeline" className="p-0">
+                    <div className="p-2">
+                      <div className="space-y-0">
+                        {timelineSteps.map((step) => {
+                          const agent = getAgent?.(step.agentId);
+                          
+                          return (
+                            <div key={step.id} className="relative pl-6 ml-3 pb-4 pt-1 border-l">
+                              {/* Timeline dot */}
+                              <div 
+                                className={cn(
+                                  "absolute left-[-4px] top-2 w-2 h-2 rounded-full",
+                                  step.status === 'thinking' ? 'bg-blue-500' :
+                                  step.status === 'completed' ? 'bg-green-500' :
+                                  step.status === 'error' ? 'bg-red-500' :
+                                  'bg-neutral-400'
+                                )}
+                              />
+                              
+                              {/* Step details */}
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="font-medium">
+                                    {agent?.name || `Agent #${step.agentId}`}
+                                  </span>
+                                  <span className="text-muted-foreground text-xs">
+                                    {formatTime(step.timestamp)}
+                                  </span>
+                                </div>
+                                <div className={cn(
+                                  "text-xs p-2 rounded",
+                                  step.status === 'thinking' ? 'bg-blue-50 dark:bg-blue-950/30' :
+                                  step.status === 'completed' ? 'bg-neutral-50 dark:bg-neutral-900/30' :
+                                  step.status === 'error' ? 'bg-red-50 dark:bg-red-950/30' :
+                                  'bg-neutral-50 dark:bg-neutral-900/30'
+                                )}>
+                                  <Markdown>{step.content}</Markdown>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </TabsContent>
+                  
+                  {/* Technical view for debugging */}
+                  {showTechnicalView && (
+                    <TabsContent value="technical" className="p-4">
+                      <pre className="bg-neutral-950 text-neutral-50 p-3 rounded text-xs overflow-auto">
+                        {JSON.stringify(messages, null, 2)}
+                      </pre>
+                    </TabsContent>
+                  )}
+                </Tabs>
+              </div>
             </>
           )}
         </Card>
