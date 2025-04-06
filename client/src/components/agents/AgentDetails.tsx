@@ -346,7 +346,40 @@ export default function AgentDetails({ onClose }: AgentDetailsProps) {
           
           <div className="mt-4">
             <Label className="block text-xs font-medium mb-1">LLM Model</Label>
-            <Select value={model} onValueChange={setModel}>
+            <Select 
+              value={model} 
+              onValueChange={setModel}
+              onOpenChange={(open) => {
+                // Refresh provider settings when dropdown is opened
+                if (open) {
+                  const fetchProviderSettings = async () => {
+                    try {
+                      const response = await fetch('/api/llm-providers');
+                      if (response.ok) {
+                        const data = await response.json();
+                        
+                        // Convert array to provider -> settings map
+                        const settingsMap: Record<string, LLMProviderSettings> = {};
+                        data.forEach((provider: LLMProviderSettings) => {
+                          settingsMap[provider.provider] = provider;
+                        });
+                        
+                        setProviderSettings(settingsMap);
+                        
+                        // Update available models if this provider is selected
+                        if (provider && settingsMap[provider] && settingsMap[provider].models) {
+                          setAvailableModels(settingsMap[provider].models || []);
+                        }
+                      }
+                    } catch (error) {
+                      console.error('Error refreshing LLM provider settings:', error);
+                    }
+                  };
+                  
+                  fetchProviderSettings();
+                }
+              }}
+            >
               <SelectTrigger className="w-full bg-neutral-50 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg text-sm">
                 <SelectValue placeholder="Select model" />
               </SelectTrigger>
