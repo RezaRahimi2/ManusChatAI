@@ -1,0 +1,48 @@
+`TabsContent` must be used within `Tabs`
+`TabsContent` must be used within `Tabs`
+`TabsContent` must be used within `Tabs`
+`TabsContent` must be used within `Tabs`
+`TabsContent` must be used within `Tabs`
+`TabsContent` must be used within `Tabs`
+The above error occurred in the <TabsContent> component:
+
+    at https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tabs.js?v=073b025a:175:13
+    at _c5 (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/src/components/ui/tabs.tsx:72:12)
+    at div
+    at _c (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/src/components/ui/card.tsx:20:11)
+    at div
+    at MessageGroup (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/src/components/chat/MessageGroup.tsx:27:3)
+    at div
+    at div
+    at Workspace (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/src/components/workspace/Workspace.tsx:30:37)
+    at div
+    at div
+    at div
+    at Home (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/src/pages/home.tsx:31:29)
+    at Route (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=073b025a:323:16)
+    at Switch (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=073b025a:379:17)
+    at Router
+    at WorkspaceProvider (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/src/context/WorkspaceContext.tsx:21:37)
+    at AgentProvider (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/src/context/AgentContext.tsx:21:33)
+    at QueryClientProvider (https://eb8eb4be-580b-482b-9e49-2d45ebdd28d5-00-1lbjnutdfblai.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=073b025a:2805:3)
+    at App
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+`TabsContent` must be used within `Tabs`
+WebSocket message received: 
+Object {type: "collaboration_started", workspaceId: 1, collaboration: {…}}
+WebSocket message received: 
+Object {type: "collaboration_step_update", workspaceId: 1, collaborationId: "collab_1743913584586_828", stepId: "step_collab_1743913584586_828_0", status: "in_progress", …}
+WebSocket message received: 
+Object {type: "thinking", thinking: true, agent: 10}
+WebSocket message received: 
+Object {type: "thinking", thinking: false, agent: 10}
+WebSocket message received: 
+Object {type: "collaboration_step_update", workspaceId: 1, collaborationId: "collab_1743913584586_828", stepId: "step_collab_1743913584586_828_0", status: "failed", …}
+WebSocket message received: 
+Object {type: "collaboration_failed", workspaceId: 1, collaborationId: "collab_1743913584586_828", error: "DeepSeek API Error: Request failed with status code 400"}
+WebSocket message received: 
+Object {type: "message", workspaceId: 1, message: {…}}
+WebSocket message received: 
+Object {type: "thinking", thinking: false, agent: 8}

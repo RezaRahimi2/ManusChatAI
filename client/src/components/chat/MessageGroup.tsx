@@ -207,52 +207,59 @@ export default function MessageGroup({
               
               {/* Agent view */}
               <TabsContent value="agents" className="p-0">
-                <Tabs defaultValue={agents[0]?.id.toString() || "0"}>
-                  <TabsList className="w-full justify-start p-2 overflow-x-auto flex-nowrap h-auto bg-muted/50">
+                {agents.length > 0 && (
+                  <Tabs defaultValue={agents[0]?.id.toString() || "0"}>
+                    <TabsList className="w-full justify-start p-2 overflow-x-auto flex-nowrap h-auto bg-muted/50">
+                      {agents.map(agent => (
+                        <TabsTrigger 
+                          key={agent.id} 
+                          value={agent.id.toString()}
+                          className="text-xs whitespace-nowrap"
+                        >
+                          {agent.name}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                    
                     {agents.map(agent => (
-                      <TabsTrigger 
-                        key={agent.id} 
-                        value={agent.id.toString()}
-                        className="text-xs whitespace-nowrap"
-                      >
-                        {agent.name}
-                      </TabsTrigger>
+                      <TabsContent key={agent.id} value={agent.id.toString()} className="p-4 space-y-4">
+                        {agentMessages
+                          .filter(msg => msg.agentId === agent.id && !(typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking'))
+                          .map((message, index) => (
+                            <div key={message.id || index} className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">
+                                  {formatTime(message.createdAt)}
+                                </span>
+                              </div>
+                              <div className="text-sm">
+                                <Markdown>{message.content}</Markdown>
+                              </div>
+                            </div>
+                          ))}
+                          
+                        {/* Show thinking if available */}
+                        {agentMessages
+                          .filter(msg => msg.agentId === agent.id && typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking')
+                          .map((message, index) => (
+                            <div key={`thinking-${message.id || index}`} className="mt-4 p-3 bg-muted/50 rounded border text-sm">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-medium">Reasoning Process</span>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                <Markdown>{message.content}</Markdown>
+                              </div>
+                            </div>
+                          ))}
+                      </TabsContent>
                     ))}
-                  </TabsList>
-                  
-                  {agents.map(agent => (
-                    <TabsContent key={agent.id} value={agent.id.toString()} className="p-4 space-y-4">
-                      {agentMessages
-                        .filter(msg => msg.agentId === agent.id && !(typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking'))
-                        .map((message, index) => (
-                          <div key={message.id || index} className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">
-                                {formatTime(message.createdAt)}
-                              </span>
-                            </div>
-                            <div className="text-sm">
-                              <Markdown>{message.content}</Markdown>
-                            </div>
-                          </div>
-                        ))}
-                        
-                      {/* Show thinking if available */}
-                      {agentMessages
-                        .filter(msg => msg.agentId === agent.id && typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking')
-                        .map((message, index) => (
-                          <div key={`thinking-${message.id || index}`} className="mt-4 p-3 bg-muted/50 rounded border text-sm">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-xs font-medium">Reasoning Process</span>
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              <Markdown>{message.content}</Markdown>
-                            </div>
-                          </div>
-                        ))}
-                    </TabsContent>
-                  ))}
-                </Tabs>
+                  </Tabs>
+                )}
+                {agents.length === 0 && (
+                  <div className="p-4 text-sm text-muted-foreground">
+                    No agent messages to display
+                  </div>
+                )}
               </TabsContent>
               
               {/* Timeline view */}
