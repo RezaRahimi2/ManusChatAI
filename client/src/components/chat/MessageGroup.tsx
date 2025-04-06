@@ -3,7 +3,11 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
-import { ChevronDown, ChevronRight, User, Bot, Clock, Brain, Search, Code, Edit, Lightbulb } from 'lucide-react';
+import { 
+  ChevronDown, ChevronRight, User, Bot, Clock, Brain, 
+  Search, Code, Edit, Lightbulb, Code2, LayoutDashboard,
+  Users, GitBranch
+} from 'lucide-react';
 import { Agent, Message } from '@shared/schema';
 import Markdown from '@/components/ui/markdown';
 import { AgentStatus } from '@/components/agents/AgentActivityIndicator';
@@ -233,67 +237,90 @@ export default function MessageGroup({
     return null;
   }
   
-  // View switchger
+  // View switcher with modern design
   const renderTabSwitch = () => (
-    <div className="w-full border-b flex items-center">
-      <button 
-        onClick={() => setActiveView('unified')} 
-        className={`px-4 py-2 text-xs ${activeView === 'unified' ? 'border-b-2 border-primary font-medium' : 'text-muted-foreground'}`}
-      >
-        Unified View
-      </button>
-      <button 
-        onClick={() => setActiveView('agents')} 
-        className={`px-4 py-2 text-xs ${activeView === 'agents' ? 'border-b-2 border-primary font-medium' : 'text-muted-foreground'}`}
-      >
-        By Agent
-      </button>
-      <button 
-        onClick={() => setActiveView('timeline')} 
-        className={`px-4 py-2 text-xs ${activeView === 'timeline' ? 'border-b-2 border-primary font-medium' : 'text-muted-foreground'}`}
-      >
-        <span className="flex items-center gap-1">
-          <Clock className="h-3.5 w-3.5" />
-          <span>Timeline</span>
-        </span>
-      </button>
-      {showTechnicalView && (
-        <button 
-          onClick={() => setActiveView('technical')} 
-          className={`px-4 py-2 text-xs ${activeView === 'technical' ? 'border-b-2 border-primary font-medium' : 'text-muted-foreground'}`}
+    <div className="w-full border-b bg-muted/20">
+      <div className="flex justify-center p-2 gap-1">
+        <button
+          onClick={() => setActiveView('unified')}
+          className={`px-3 py-1.5 text-xs rounded-md flex items-center gap-1.5 transition-all ${
+            activeView === 'unified'
+              ? 'bg-white dark:bg-neutral-800 text-primary font-medium shadow-sm border border-primary/20'
+              : 'hover:bg-white/70 dark:hover:bg-neutral-800/70 text-muted-foreground hover:text-foreground'
+          }`}
         >
-          Technical View
+          <LayoutDashboard className="h-3 w-3" />
+          Unified View
         </button>
-      )}
+        <button
+          onClick={() => setActiveView('agents')}
+          className={`px-3 py-1.5 text-xs rounded-md flex items-center gap-1.5 transition-all ${
+            activeView === 'agents'
+              ? 'bg-white dark:bg-neutral-800 text-primary font-medium shadow-sm border border-primary/20'
+              : 'hover:bg-white/70 dark:hover:bg-neutral-800/70 text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Users className="h-3 w-3" />
+          By Agent
+        </button>
+        <button
+          onClick={() => setActiveView('timeline')}
+          className={`px-3 py-1.5 text-xs rounded-md flex items-center gap-1.5 transition-all ${
+            activeView === 'timeline'
+              ? 'bg-white dark:bg-neutral-800 text-primary font-medium shadow-sm border border-primary/20'
+              : 'hover:bg-white/70 dark:hover:bg-neutral-800/70 text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <GitBranch className="h-3 w-3" />
+          Timeline
+        </button>
+        {showTechnicalView && (
+          <button
+            onClick={() => setActiveView('technical')}
+            className={`px-3 py-1.5 text-xs rounded-md flex items-center gap-1.5 transition-all ${
+              activeView === 'technical'
+                ? 'bg-white dark:bg-neutral-800 text-primary font-medium shadow-sm border border-primary/20'
+                : 'hover:bg-white/70 dark:hover:bg-neutral-800/70 text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Code2 className="h-3 w-3" />
+            Technical View
+          </button>
+        )}
+      </div>
     </div>
   );
   
   // Unified view
   const renderUnifiedView = () => (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-4">
       {agentMessages
         .filter(msg => !(typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking'))
         .map((message, index) => {
           const agent = getAgent?.(message.agentId || 0);
           return (
-            <div key={message.id || index} className="space-y-3 border-l-4 pl-4" style={{ borderColor: getAgentColor(agent?.type) }}>
+            <div key={message.id || index} className="rounded-md overflow-hidden border shadow-sm" style={{ borderLeft: `4px solid ${getAgentColor(agent?.type)}` }}>
               {agent && (
-                <div className="flex items-center gap-2 bg-muted/40 p-2 rounded-t">
-                  <Avatar className="h-6 w-6 bg-primary/10">
-                    {getAgentIcon(agent.type)}
-                  </Avatar>
-                  <div>
-                    <span className="text-sm font-bold text-primary">{agent.name}</span>
-                    <span className="text-xs ml-2 text-muted-foreground">
+                <div className="flex items-center justify-between bg-muted/40 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-6 w-6 bg-primary/10">
+                      {getAgentIcon(agent.type)}
+                    </Avatar>
+                    <div>
+                      <span className="text-sm font-semibold" style={{ color: getAgentColor(agent?.type) }}>{agent.name}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
+                      {getActionLabel(message)}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
                       {formatTime(message.createdAt)}
                     </span>
                   </div>
-                  <div className="ml-2 text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
-                    {getActionLabel(message)}
-                  </div>
                 </div>
               )}
-              <div className="text-sm bg-card p-3 rounded shadow-sm">
+              <div className="text-sm bg-card p-3">
                 <Markdown>{message.content}</Markdown>
               </div>
             </div>
@@ -308,17 +335,21 @@ export default function MessageGroup({
       {/* Agent selector */}
       {agents.length > 0 && (
         <>
-          <div className="w-full bg-muted/50 p-2 flex overflow-x-auto flex-nowrap">
+          <div className="w-full bg-muted/50 p-2 flex overflow-x-auto flex-nowrap gap-1">
             {agents.map((agent) => (
               <button
                 key={agent.id}
                 onClick={() => setActiveAgentId(agent.id)}
-                className={`text-xs whitespace-nowrap px-3 py-1.5 rounded-md transition-colors ${
+                className={`text-xs whitespace-nowrap px-3 py-1.5 rounded-md transition-colors flex items-center gap-1 ${
                   activeAgentId === agent.id
-                    ? 'bg-background text-foreground shadow-sm' 
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-white dark:bg-neutral-800 text-primary font-medium shadow-sm border border-primary/20' 
+                    : 'text-muted-foreground hover:bg-white/50 dark:hover:bg-neutral-800/50 hover:text-foreground'
                 }`}
+                style={{ 
+                  borderLeft: activeAgentId === agent.id ? `3px solid ${getAgentColor(agent.type)}` : ''
+                }}
               >
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: getAgentColor(agent.type) }}></span>
                 {agent.name}
               </button>
             ))}
@@ -348,18 +379,22 @@ export default function MessageGroup({
                 {agentMessages
                   .filter(msg => msg.agentId === agent.id && !(typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking'))
                   .map((message, index) => (
-                    <div key={message.id || index} className="space-y-2 border-l-2 pl-3" style={{ borderColor: getAgentColor(agent.type) }}>
-                      <div className="flex items-center gap-2 bg-muted/30 p-2 rounded-t">
-                        <div className="flex items-center">
-                          <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground mr-2">
+                    <div key={message.id || index} className="rounded-md overflow-hidden border shadow-sm" style={{ borderLeft: `4px solid ${getAgentColor(agent.type)}` }}>
+                      <div className="flex items-center justify-between bg-muted/30 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex text-xs items-center font-medium px-2 py-0.5 rounded-full" 
+                               style={{ 
+                                 backgroundColor: `${getAgentColor(agent.type)}20`,
+                                 color: getAgentColor(agent.type)
+                               }}>
                             {getActionLabel(message)}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {formatTime(message.createdAt)}
-                          </span>
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatTime(message.createdAt)}
                         </div>
                       </div>
-                      <div className="text-sm bg-card p-3 rounded shadow-sm">
+                      <div className="text-sm bg-card p-3">
                         <Markdown>{message.content}</Markdown>
                       </div>
                     </div>
@@ -369,17 +404,19 @@ export default function MessageGroup({
                 {agentMessages
                   .filter(msg => msg.agentId === agent.id && typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking')
                   .map((message, index) => (
-                    <div key={`thinking-${message.id || index}`} className="mt-4 p-3 bg-blue-50/30 dark:bg-blue-950/20 rounded border-l-2 border border-blue-200 dark:border-blue-900 text-sm">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-medium flex items-center">
-                          <Brain className="h-3.5 w-3.5 mr-1 text-blue-500" />
-                          Reasoning Process
-                        </span>
-                        <span className="text-xs text-muted-foreground">
+                    <div key={`thinking-${message.id || index}`} className="rounded-md overflow-hidden border shadow-sm bg-blue-50/30 dark:bg-blue-950/20">
+                      <div className="flex items-center justify-between bg-blue-100/50 dark:bg-blue-900/30 px-3 py-2 border-b border-blue-200 dark:border-blue-800">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium flex items-center text-blue-700 dark:text-blue-400">
+                            <Brain className="h-3.5 w-3.5 mr-1" />
+                            Reasoning Process
+                          </span>
+                        </div>
+                        <div className="text-xs text-blue-600/80 dark:text-blue-400/80">
                           {formatTime(message.createdAt)}
-                        </span>
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-xs p-3 text-muted-foreground">
                         <Markdown>{message.content}</Markdown>
                       </div>
                     </div>
@@ -501,17 +538,25 @@ export default function MessageGroup({
       
       {/* Agent responses section */}
       {agentMessages.length > 0 && (
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden border shadow-md">
           {/* Header with expand/collapse */}
           <div 
-            className="flex items-center justify-between p-3 bg-muted cursor-pointer"
+            className="flex items-center justify-between p-3 bg-primary/5 cursor-pointer border-b"
             onClick={() => setExpanded(!expanded)}
           >
             <div className="flex items-center gap-2">
-              <Bot className="h-4 w-4" />
+              <Bot className="h-4 w-4 text-primary" />
               <h3 className="text-sm font-medium">Agent Collaboration {collaborationId && `#${collaborationId}`}</h3>
             </div>
-            <Button variant="ghost" size="icon" className="h-6 w-6">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6 hover:bg-primary/10"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded(!expanded);
+              }}
+            >
               {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </Button>
           </div>
