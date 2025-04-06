@@ -41,74 +41,112 @@ export default function AgentTimeline({
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
   
-  // Extract timeline events from messages and agent statuses
+  // Extract timeline events from messages and agent statuses 
+  // Memoize event generation to avoid infinite render loops
   useEffect(() => {
-    if (!messages.length && !activeAgents.length) return;
+    // Skip if no data to process
+    if (!messages.length && !activeAgents.length) {
+      setEvents([]);
+      return;
+    }
     
-    const newEvents: TimelineEvent[] = [];
+    // Create a stable JSON representation of the inputs for comparison
+    const messagesJSON = JSON.stringify(messages.map(m => ({
+      id: m.id,
+      agentId: m.agentId,
+      createdAt: m.createdAt,
+      content: m.content,
+      metadata: m.metadata
+    })));
     
-    // Add events from messages
-    messages.forEach(message => {
-      if (!message.agentId) return;
+    const agentsJSON = JSON.stringify(agents.map(a => ({
+      id: a.id,
+      name: a.name
+    })));
+    
+    const activeAgentsJSON = JSON.stringify(activeAgents.map(a => ({
+      id: a.agent.id,
+      status: a.status
+    })));
+    
+    // Create a stabilized identifier for dependencies
+    const dependencyHash = `${messagesJSON}-${agentsJSON}-${activeAgentsJSON}`;
+    
+    // Don't regenerate events if dependencies haven't changed
+    const generateEvents = () => {
+      const newEvents: TimelineEvent[] = [];
       
-      // Find corresponding agent
-      const agent = agents.find(a => a.id === message.agentId);
-      if (!agent) return;
-      
-      // Determine status based on message metadata.type
-      let status: TimelineEvent['status'] = 'completed';
-      const messageType = typeof message.metadata === 'object' && message.metadata 
-        ? (message.metadata as any)?.type 
-        : null;
-      
-      if (messageType === 'thinking') {
-        status = 'thinking';
-      } else if (messageType === 'error') {
-        status = 'error';
-      }
-      
-      newEvents.push({
-        agent,
-        timestamp: new Date(message.createdAt),
-        status,
-        message: message.content
+      // Add events from messages
+      messages.forEach(message => {
+        if (!message.agentId) return;
+        
+        // Find corresponding agent
+        const agent = agents.find(a => a.id === message.agentId);
+        if (!agent) return;
+        
+        // Determine status based on message metadata.type
+        let status: TimelineEvent['status'] = 'completed';
+        const messageType = typeof message.metadata === 'object' && message.metadata 
+          ? (message.metadata as any)?.type 
+          : null;
+        
+        if (messageType === 'thinking') {
+          status = 'thinking';
+        } else if (messageType === 'error') {
+          status = 'error';
+        }
+        
+        newEvents.push({
+          agent,
+          timestamp: new Date(message.createdAt),
+          status,
+          message: message.content
+        });
       });
-    });
-    
-    // Add events from active agents
-    activeAgents.forEach(({ agent, status }) => {
-      // Skip if agent is already in timeline with more recent events
-      const lastAgentEvent = newEvents
-        .filter(e => e.agent.id === agent.id)
-        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0];
       
-      if (lastAgentEvent && 
-          (lastAgentEvent.status === 'thinking' || lastAgentEvent.status === 'completed')) {
-        return;
-      }
-      
-      // Map status string to timeline status
-      let timelineStatus: TimelineEvent['status'] = 'waiting';
-      if (status === 'processing') {
-        timelineStatus = 'active';
-      } else if (status === 'completed') {
-        timelineStatus = 'completed';
-      } else if (status === 'error') {
-        timelineStatus = 'error';
-      }
-      
-      newEvents.push({
-        agent,
-        timestamp: new Date(),
-        status: timelineStatus
+      // Add events from active agents
+      activeAgents.forEach(({ agent, status }) => {
+        // Skip if agent is already in timeline with more recent events
+        const lastAgentEvent = newEvents
+          .filter(e => e.agent.id === agent.id)
+          .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0];
+        
+        if (lastAgentEvent && 
+            (lastAgentEvent.status === 'thinking' || lastAgentEvent.status === 'completed')) {
+          return;
+        }
+        
+        // Map status string to timeline status
+        let timelineStatus: TimelineEvent['status'] = 'waiting';
+        if (status === 'processing') {
+          timelineStatus = 'active';
+        } else if (status === 'completed') {
+          timelineStatus = 'completed';
+        } else if (status === 'error') {
+          timelineStatus = 'error';
+        }
+        
+        newEvents.push({
+          agent,
+          timestamp: new Date(),
+          status: timelineStatus
+        });
       });
-    });
+      
+      // Sort events by timestamp, most recent first
+      newEvents.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      
+      return newEvents;
+    };
     
-    // Sort events by timestamp, most recent first
-    newEvents.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    // Process once for each unique set of dependencies
+    setEvents(generateEvents());
     
-    setEvents(newEvents);
-  }, [messages, activeAgents, agents]);
+  // Using this stable dependency identifier instead of the actual objects
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(messages.map(m => m.id)), 
+      JSON.stringify(activeAgents.map(a => `${a.agent.id}-${a.status}`)), 
+      JSON.stringify(agents.map(a => a.id))]);
   
   // No timeline if there are no events
   if (events.length === 0) {

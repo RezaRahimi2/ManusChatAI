@@ -401,29 +401,16 @@ export class CollaborationProtocol {
         }
       }
       
-      // Create a system message to provide context about the collaboration
-      const contextMessage: Message = {
-        id: Date.now(),
-        workspaceId: collaboration.workspaceId,
-        role: 'system',
-        content: `You are participating in a multi-agent collaboration in ${collaboration.mode} mode. Your specific role in this step is: ${agent.getType()} agent.`,
-        agentId: step.agentId,
-        metadata: {
-          collaborationId: collaboration.id,
-          stepId: step.id,
-          type: 'collaboration_context'
-        },
-        createdAt: Date.now()
-      };
+      // Create the input message with collaboration context embedded
+      // Instead of creating a separate system message (which causes problems with DeepSeek API)
+      // we'll include the collaboration context as part of the user message
+      const enhancedInput = `[Collaboration Context: You are participating in a multi-agent collaboration in ${collaboration.mode} mode. Your specific role in this step is: ${agent.getType()} agent.]\n\n${processedInput}`;
       
-      await storage.createMessage(contextMessage);
-      
-      // Create the input message
       const inputMessage: Message = {
         id: Date.now(),
         workspaceId: collaboration.workspaceId,
         role: 'user',
-        content: processedInput,
+        content: enhancedInput,
         agentId: step.agentId,
         metadata: {
           collaborationId: collaboration.id,
@@ -436,8 +423,8 @@ export class CollaborationProtocol {
       await storage.createMessage(inputMessage);
       step.messageIds.push(inputMessage.id);
       
-      // Generate response using the agent
-      const response = await agent.generateResponse(collaboration.workspaceId, processedInput);
+      // Generate response using the agent with the enhanced input
+      const response = await agent.generateResponse(collaboration.workspaceId, enhancedInput);
       
       // Find the response message ID that was just created in generateResponse
       // Usually the last message created for this agent in this workspace
