@@ -1,72 +1,91 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import remarkGfm from 'remark-gfm';
+import { cn } from '@/lib/utils';
 
 interface MarkdownProps {
-  content: string;
+  children: string;
+  className?: string;
 }
 
-export function Markdown({ content }: MarkdownProps) {
+export function Markdown({ children, className }: MarkdownProps) {
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      components={{
-        code({ node, inline, className, children, ...props }) {
-          const match = /language-(\w+)/.exec(className || '');
-          return !inline && match ? (
-            <SyntaxHighlighter
-              style={vscDarkPlus}
-              language={match[1]}
-              PreTag="div"
-              {...props}
+    <div className={cn("prose prose-sm dark:prose-invert max-w-none", className)}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code: ({ className, children, ...props }: any) => {
+            const match = /language-(\w+)/.exec(className || '');
+            const inline = !match;
+            
+            return !inline ? (
+              <SyntaxHighlighter
+                style={vscDarkPlus as any}
+                language={match ? match[1] : ''}
+                customStyle={{ 
+                  borderRadius: '0.375rem',
+                  margin: '1rem 0'
+                }}
+                PreTag="div"
+                {...props}
+              >
+                {String(children).replace(/\n$/, '')}
+              </SyntaxHighlighter>
+            ) : (
+              <code 
+                className="bg-neutral-100 dark:bg-neutral-900 px-1 py-0.5 rounded font-mono text-sm"
+                {...props}
+              >
+                {children}
+              </code>
+            );
+          },
+          // Custom table styling
+          table: ({ children }: any) => (
+            <div className="overflow-x-auto my-6">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                {children}
+              </table>
+            </div>
+          ),
+          // Custom link styling
+          a: ({ children, href }: any) => (
+            <a
+              href={href}
+              className="text-blue-600 dark:text-blue-400 hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              {String(children).replace(/\n$/, '')}
-            </SyntaxHighlighter>
-          ) : (
-            <code className={`font-mono text-sm px-1 py-0.5 bg-neutral-100 dark:bg-neutral-800 rounded ${className}`} {...props}>
               {children}
-            </code>
-          );
-        },
-        // Apply styling to other markdown elements
-        h1: ({ children }) => <h1 className="text-2xl font-bold mt-6 mb-4">{children}</h1>,
-        h2: ({ children }) => <h2 className="text-xl font-bold mt-5 mb-3">{children}</h2>,
-        h3: ({ children }) => <h3 className="text-lg font-medium mt-4 mb-2">{children}</h3>,
-        h4: ({ children }) => <h4 className="text-base font-medium mt-3 mb-1">{children}</h4>,
-        p: ({ children }) => <p className="mb-4">{children}</p>,
-        a: ({ href, children }) => (
-          <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary-500 hover:underline">
-            {children}
-          </a>
-        ),
-        ul: ({ children }) => <ul className="list-disc pl-5 mb-4">{children}</ul>,
-        ol: ({ children }) => <ol className="list-decimal pl-5 mb-4">{children}</ol>,
-        li: ({ children }) => <li className="mb-1">{children}</li>,
-        blockquote: ({ children }) => (
-          <blockquote className="border-l-4 border-neutral-300 dark:border-neutral-600 pl-4 py-2 mb-4 italic">
-            {children}
-          </blockquote>
-        ),
-        table: ({ children }) => (
-          <div className="overflow-x-auto mb-4">
-            <table className="min-w-full divide-y divide-neutral-200 dark:divide-neutral-700">
+            </a>
+          ),
+          // Custom blockquote styling
+          blockquote: ({ children }: any) => (
+            <blockquote
+              className="border-l-4 border-neutral-300 dark:border-neutral-700 pl-4 py-1 my-4 text-neutral-600 dark:text-neutral-400"
+            >
               {children}
-            </table>
-          </div>
-        ),
-        thead: ({ children }) => <thead className="bg-neutral-50 dark:bg-neutral-800">{children}</thead>,
-        tbody: ({ children }) => <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">{children}</tbody>,
-        tr: ({ children }) => <tr>{children}</tr>,
-        th: ({ children }) => (
-          <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider">{children}</th>
-        ),
-        td: ({ children }) => <td className="px-3 py-2 text-sm">{children}</td>,
-        hr: () => <hr className="my-6 border-neutral-200 dark:border-neutral-700" />,
-      }}
-    >
-      {content}
-    </ReactMarkdown>
+            </blockquote>
+          ),
+          // Custom list styling
+          ul: ({ children }: any) => (
+            <ul className="list-disc pl-6 my-4">
+              {children}
+            </ul>
+          ),
+          ol: ({ children }: any) => (
+            <ol className="list-decimal pl-6 my-4">
+              {children}
+            </ol>
+          )
+        }}
+      >
+        {children}
+      </ReactMarkdown>
+    </div>
   );
 }
+
+export default Markdown;

@@ -1,0 +1,112 @@
+import React, { useState } from 'react';
+import { Agent } from '@shared/schema';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Markdown } from '@/components/ui/markdown';
+import AgentActivityIndicator from '@/components/agents/AgentActivityIndicator';
+
+interface ThinkingMessageProps {
+  agent?: Agent;
+  content?: string;
+  showTechnicalView?: boolean;
+  className?: string;
+}
+
+/**
+ * Animated "thinking" indicator shown while agents are processing
+ */
+export default function ThinkingMessage({
+  agent,
+  content,
+  showTechnicalView = false,
+  className = ''
+}: ThinkingMessageProps) {
+  const [expanded, setExpanded] = useState(false);
+  
+  // No agent or no content means nothing to render
+  if (!agent) return null;
+  
+  // Extract tools from thinking content if available
+  const extractTools = (): string[] => {
+    if (!content) return [];
+    
+    // Extract tool names from content
+    try {
+      // Look for tool mentions
+      const toolNames: string[] = [];
+      const mentionPatterns = [
+        /Using tool: ([a-zA-Z0-9_\-]+)/gi,
+        /Tool: ([a-zA-Z0-9_\-]+)/gi,
+        /Execute ([a-zA-Z0-9_\-]+)/gi
+      ];
+      
+      mentionPatterns.forEach(pattern => {
+        const text = content || '';
+        let matches = text.match(pattern);
+        
+        if (matches) {
+          matches.forEach(match => {
+            const extracted = match.replace(/Using tool: |Tool: |Execute /i, '');
+            if (extracted) {
+              toolNames.push(extracted);
+            }
+          });
+        }
+      });
+      
+      // Remove duplicates using filter
+      return toolNames.filter((tool, index, self) => 
+        self.indexOf(tool) === index
+      );
+    } catch (error) {
+      console.error('Error extracting tools:', error);
+      return [];
+    }
+  };
+  
+  const tools = extractTools();
+  
+  return (
+    <div className={`flex flex-col ${className}`}>
+      <div className="flex items-center gap-2">
+        {/* Agent activity indicator */}
+        <AgentActivityIndicator
+          agent={agent}
+          isActive={true}
+          currentTools={tools}
+        />
+        
+        {/* Thinking content expansion button (only if there's content) */}
+        {content && showTechnicalView && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-6 p-1"
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+            <span className="text-xs ml-1">
+              {expanded ? 'Hide thinking' : 'Show thinking'}
+            </span>
+          </Button>
+        )}
+      </div>
+      
+      {/* Expanded thinking content */}
+      {expanded && content && (
+        <Card className="mt-2 bg-neutral-50 dark:bg-neutral-900">
+          <CardContent className="p-3">
+            <div className="text-xs text-neutral-700 dark:text-neutral-300 overflow-auto max-h-96">
+              <Markdown>{content}</Markdown>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}

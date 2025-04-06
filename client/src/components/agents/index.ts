@@ -1,3 +1,7 @@
-export { default as AgentActivityIndicator } from './AgentActivityIndicator';
-export { AgentStatus } from './AgentActivityIndicator';
-export { default as AgentTeamSelector } from './AgentTeamSelector';
+import AgentActivityIndicator from './AgentActivityIndicator';
+import AgentTeamSelector from './AgentTeamSelector';
+
+export {
+  AgentActivityIndicator,
+  AgentTeamSelector
+};

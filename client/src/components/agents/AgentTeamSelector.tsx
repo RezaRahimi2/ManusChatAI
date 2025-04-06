@@ -1,161 +1,191 @@
 import React from 'react';
-import { useAgentContext } from '@/context/AgentContext';
+import { Agent } from '@shared/schema';
+import { X, Plus, Search } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
+import AgentActivityIndicator from './AgentActivityIndicator';
 
 interface AgentTeamSelectorProps {
-  selectedAgents: number[];
-  onSelectAgents: (agentIds: number[]) => void;
+  agents: Agent[];
+  selectedAgents: Agent[];
+  onSelectAgent: (agent: Agent) => void;
+  onRemoveAgent: (agent: Agent) => void;
   className?: string;
 }
 
 /**
- * UI for selecting a team of agents to collaborate
+ * Component for selecting agents to form a team for collaborative tasks
  */
-export default function AgentTeamSelector({ 
-  selectedAgents, 
-  onSelectAgents, 
-  className = '' 
+export default function AgentTeamSelector({
+  agents,
+  selectedAgents,
+  onSelectAgent,
+  onRemoveAgent,
+  className = ''
 }: AgentTeamSelectorProps) {
-  const { getAllAgents } = useAgentContext();
-  const agents = getAllAgents();
+  const [search, setSearch] = React.useState('');
+  const [open, setOpen] = React.useState(false);
   
-  // Toggle agent selection
-  const toggleAgent = (agentId: number) => {
-    const newSelection = selectedAgents.includes(agentId)
-      ? selectedAgents.filter(id => id !== agentId)
-      : [...selectedAgents, agentId];
+  // Filter available agents based on search and already selected
+  const filteredAgents = React.useMemo(() => {
+    const searchLower = search.toLowerCase();
     
-    onSelectAgents(newSelection);
-  };
-
-  // Calculate compatibility rating between agents
-  const getCompatibilityRating = (agent1Id: number, agent2Id: number): number => {
-    const agent1 = agents.find(a => a.id === agent1Id);
-    const agent2 = agents.find(a => a.id === agent2Id);
-    
-    if (!agent1 || !agent2) return 0;
-    
-    // High compatibility when different agent types are paired
-    // This is a simplified example - in a real app, this would be more sophisticated
-    if (agent1.type !== agent2.type) {
-      // Research + Code is highest compatibility
-      if (
-        (agent1.type === 'research' && agent2.type === 'code') ||
-        (agent1.type === 'code' && agent2.type === 'research')
-      ) {
-        return 5;
-      }
-      
-      // Orchestrator + any other type has good compatibility
-      if (agent1.type === 'orchestrator' || agent2.type === 'orchestrator') {
-        return 4;
-      }
-      
-      return 3; // Different types have decent compatibility
-    }
-    
-    // Same types have lower compatibility
-    return 2;
-  };
+    return agents
+      .filter(agent => 
+        // Filter out already selected agents
+        !selectedAgents.some(selected => selected.id === agent.id) &&
+        // Match against name or type
+        (agent.name.toLowerCase().includes(searchLower) || 
+         (agent.type && agent.type.toLowerCase().includes(searchLower)))
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [agents, selectedAgents, search]);
   
-  // Calculate average compatibility score for selected agents
-  const getTeamCompatibility = (): number => {
-    if (selectedAgents.length < 2) return 0;
+  // Group selected agents by type for better organization
+  const groupedSelectedAgents = React.useMemo(() => {
+    const groups: Record<string, Agent[]> = {};
     
-    let totalScore = 0;
-    let pairCount = 0;
-    
-    // Compare each agent with every other agent
-    for (let i = 0; i < selectedAgents.length; i++) {
-      for (let j = i + 1; j < selectedAgents.length; j++) {
-        totalScore += getCompatibilityRating(selectedAgents[i], selectedAgents[j]);
-        pairCount++;
+    selectedAgents.forEach(agent => {
+      const type = agent.type || 'Other';
+      if (!groups[type]) {
+        groups[type] = [];
       }
-    }
+      groups[type].push(agent);
+    });
     
-    return pairCount > 0 ? Math.round((totalScore / pairCount) * 10) / 10 : 0;
+    return groups;
+  }, [selectedAgents]);
+  
+  // Get agent initials for avatar
+  const getAgentInitials = (name: string): string => {
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
   };
   
-  // Team compatibility metrics
-  const teamCompatibility = getTeamCompatibility();
-
+  // Get background color based on agent type
+  const getAgentColor = (type: string = ''): string => {
+    const colorMap: Record<string, string> = {
+      research: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
+      code: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+      writer: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
+      reasoning: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
+      planner: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
+      orchestrator: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+    };
+    
+    // Find matching color based on type substring
+    const matchedType = Object.keys(colorMap).find(key => 
+      type.toLowerCase().includes(key)
+    );
+    
+    return matchedType 
+      ? colorMap[matchedType] 
+      : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+  };
+  
   return (
-    <div className={`${className}`}>
-      {/* Agent selection grid */}
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
-        {agents.map(agent => (
-          <div
-            key={agent.id}
-            onClick={() => toggleAgent(agent.id)}
-            className={`
-              p-3 rounded-lg border cursor-pointer transition-all
-              ${selectedAgents.includes(agent.id)
-                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 shadow-sm'
-                : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:border-primary-300 dark:hover:border-primary-600'
-              }
-            `}
-          >
-            <div className="flex items-start">
-              <div 
-                className={`
-                  w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mr-2
-                  ${selectedAgents.includes(agent.id)
-                    ? 'bg-primary-500 text-white'
-                    : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-500 dark:text-neutral-400'
-                  }
-                `}
+    <div className={cn("space-y-2", className)}>
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Selected agents display */}
+        {Object.entries(groupedSelectedAgents).map(([type, agents]) => (
+          <div key={type} className="flex flex-wrap items-center gap-1">
+            {agents.map(agent => (
+              <Badge 
+                key={agent.id} 
+                variant="secondary"
+                className={cn(
+                  "flex items-center gap-1 pl-1 h-7",
+                  getAgentColor(agent.type)
+                )}
               >
-                <span className="material-icons text-lg">
-                  {agent.type === 'research' && 'search'}
-                  {agent.type === 'code' && 'code'}
-                  {agent.type === 'writer' && 'edit_note'}
-                  {agent.type === 'orchestrator' && 'psychology'}
-                  {agent.type === 'planner' && 'task_alt'}
-                  {!['research', 'code', 'writer', 'orchestrator', 'planner'].includes(agent.type) && 'smart_toy'}
-                </span>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium truncate">{agent.name}</h4>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 capitalize">{agent.type}</p>
-              </div>
-            </div>
+                <span className="font-medium">{getAgentInitials(agent.name)}</span>
+                <span className="text-xs">{agent.name}</span>
+                <Button
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-5 w-5 ml-1 rounded-full hover:bg-red-100 hover:text-red-500"
+                  onClick={() => onRemoveAgent(agent)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            ))}
           </div>
         ))}
-      </div>
-      
-      {/* Team compatibility display */}
-      {selectedAgents.length >= 2 && (
-        <div className="mt-4 p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700">
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Team Compatibility</span>
-            <div className="flex items-center">
-              <div className="flex">
-                {[1, 2, 3, 4, 5].map(star => (
-                  <span 
-                    key={star}
-                    className={`material-icons text-sm ${
-                      star <= Math.round(teamCompatibility)
-                        ? 'text-amber-500'
-                        : 'text-neutral-300 dark:text-neutral-600'
-                    }`}
-                  >
-                    {star <= Math.round(teamCompatibility) ? 'star' : 'star_outline'}
-                  </span>
-                ))}
+        
+        {/* Add agent button */}
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-7 gap-1"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span className="text-xs">Add Agent</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-0" align="start">
+            <div className="p-2">
+              <div className="flex items-center rounded-md border px-3" cmdk-input-wrapper="">
+                <Search className="h-4 w-4 shrink-0 opacity-50" />
+                <Input
+                  placeholder="Search agents..."
+                  className="h-8 w-full border-0 bg-transparent p-1 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
               </div>
-              <span className="ml-1 text-sm font-medium">{teamCompatibility}</span>
             </div>
-          </div>
-          
-          {/* Compatibility hints */}
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-            {teamCompatibility >= 4 
-              ? 'Excellent team composition with complementary skills.'
-              : teamCompatibility >= 3
-              ? 'Good team balance. Consider adding specialized agents for complex tasks.'
-              : 'This team may have overlapping capabilities. Consider adding diverse agent types.'}
-          </p>
-        </div>
-      )}
+            <Separator />
+            <ScrollArea className="h-[300px]">
+              {filteredAgents.length === 0 ? (
+                <div className="p-4 text-center text-sm text-gray-500">
+                  {search ? 'No agents found' : 'All agents already selected'}
+                </div>
+              ) : (
+                <div className="p-2">
+                  {filteredAgents.map(agent => (
+                    <div 
+                      key={agent.id}
+                      className="flex items-center justify-between rounded-md p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                      onClick={() => {
+                        onSelectAgent(agent);
+                        setSearch('');
+                        setOpen(false);
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <AgentActivityIndicator agent={agent} isActive={false} />
+                        <div>
+                          <div className="text-sm font-medium">{agent.name}</div>
+                          <div className="text-xs text-gray-500">{agent.type}</div>
+                        </div>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6 rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </PopoverContent>
+        </Popover>
+      </div>
     </div>
   );
 }

@@ -1,99 +1,238 @@
 import React from 'react';
-import { Agent } from '@shared/schema';
-import AgentActivityIndicator, { AgentStatus } from '@/components/agents/AgentActivityIndicator';
-
-interface ActiveAgent {
-  agent: Agent;
-  status: AgentStatus;
-}
+import { Agent, Message } from '@shared/schema';
+import { cn } from '@/lib/utils';
+import { 
+  AlignJustify, 
+  Check, 
+  Clock, 
+  AlertCircle, 
+  ArrowRight,
+  Loader2
+} from 'lucide-react';
+import { 
+  Tooltip, 
+  TooltipContent, 
+  TooltipTrigger 
+} from '@/components/ui/tooltip';
+import { format } from 'date-fns';
 
 interface AgentTimelineProps {
-  activeAgents: ActiveAgent[];
-  onShowDetails?: () => void;
+  agents: Agent[];
+  messages: Message[];
   className?: string;
 }
 
+interface TimelineEvent {
+  agent: Agent;
+  timestamp: Date;
+  status: 'waiting' | 'thinking' | 'completed' | 'error' | 'active';
+  message?: string;
+}
+
 /**
- * Timeline view of currently active agents and their status
+ * Timeline visualization of agent activities during collaboration
  */
-export default function AgentTimeline({ 
-  activeAgents, 
-  onShowDetails,
-  className = '' 
+export default function AgentTimeline({
+  agents,
+  messages,
+  className = ''
 }: AgentTimelineProps) {
-  // Count agents by status
-  const statusCounts = activeAgents.reduce((counts, { status }) => {
-    counts[status] = (counts[status] || 0) + 1;
-    return counts;
-  }, {} as Record<AgentStatus, number>);
+  // Generate events from messages
+  const timelineEvents = React.useMemo(() => {
+    const events: TimelineEvent[] = [];
+    let activeAgents = new Set<number>();
+    
+    messages.forEach(message => {
+      if (!message.agentId) return;
+      
+      const agent = agents.find(a => a.id === message.agentId);
+      if (!agent) return;
+      
+      const timestamp = new Date(message.createdAt);
+      
+      // Skip system messages or non-relevant messages
+      if (message.role === 'system') return;
+      
+      if (message.role === 'thinking') {
+        events.push({
+          agent,
+          timestamp,
+          status: 'thinking',
+          message: message.content
+        });
+        activeAgents.add(agent.id);
+      } else if (message.role === 'assistant' && message.metadata && typeof message.metadata === 'object') {
+        // Check for metadata on status changes
+        const metadata = message.metadata as Record<string, any>;
+        
+        if (metadata.status === 'completed') {
+          events.push({
+            agent,
+            timestamp,
+            status: 'completed',
+            message: message.content
+          });
+          activeAgents.delete(agent.id);
+        } else if (metadata.status === 'error') {
+          events.push({
+            agent,
+            timestamp,
+            status: 'error',
+            message: message.content
+          });
+          activeAgents.delete(agent.id);
+        } else if (metadata.status === 'waiting') {
+          events.push({
+            agent,
+            timestamp,
+            status: 'waiting',
+            message: message.content
+          });
+        }
+      } else if (message.role === 'assistant') {
+        // Regular assistant message
+        events.push({
+          agent,
+          timestamp,
+          status: activeAgents.has(agent.id) ? 'active' : 'completed',
+          message: message.content
+        });
+      }
+    });
+    
+    // Sort events by timestamp
+    return events.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+  }, [agents, messages]);
   
-  const processingCount = statusCounts[AgentStatus.PROCESSING] || 0;
-  const waitingCount = statusCounts[AgentStatus.WAITING] || 0;
-  const completedCount = statusCounts[AgentStatus.COMPLETED] || 0;
+  // Format time in a human-friendly way
+  const formatTime = (date: Date): string => {
+    return format(date, 'HH:mm:ss');
+  };
+  
+  // Get status icon
+  const getStatusIcon = (status: TimelineEvent['status']) => {
+    switch (status) {
+      case 'waiting':
+        return <Clock className="h-3.5 w-3.5 text-neutral-500" />;
+      case 'thinking':
+        return <Loader2 className="h-3.5 w-3.5 text-blue-500 animate-spin" />;
+      case 'completed':
+        return <Check className="h-3.5 w-3.5 text-green-500" />;
+      case 'error':
+        return <AlertCircle className="h-3.5 w-3.5 text-red-500" />;
+      case 'active':
+        return <ArrowRight className="h-3.5 w-3.5 text-purple-500" />;
+      default:
+        return <AlignJustify className="h-3.5 w-3.5 text-neutral-500" />;
+    }
+  };
+  
+  // Get agent dot color
+  const getAgentColor = (type: string = ''): string => {
+    const colorMap: Record<string, string> = {
+      research: 'bg-purple-400',
+      code: 'bg-blue-400',
+      writer: 'bg-green-400',
+      reasoning: 'bg-yellow-400',
+      planner: 'bg-orange-400',
+      orchestrator: 'bg-red-400'
+    };
+    
+    // Find matching color based on type substring
+    const matchedType = Object.keys(colorMap).find(key => 
+      type.toLowerCase().includes(key)
+    );
+    
+    return matchedType ? colorMap[matchedType] : 'bg-gray-400';
+  };
+  
+  // Get agent initials
+  const getAgentInitials = (name: string): string => {
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+  };
+  
+  // Group events by agent
+  const agentGroupedEvents = React.useMemo(() => {
+    const groups: Record<number, TimelineEvent[]> = {};
+    
+    timelineEvents.forEach(event => {
+      if (!groups[event.agent.id]) {
+        groups[event.agent.id] = [];
+      }
+      groups[event.agent.id].push(event);
+    });
+    
+    return groups;
+  }, [timelineEvents]);
+  
+  if (timelineEvents.length === 0) {
+    return (
+      <div className={cn("text-center py-4 text-sm text-neutral-500", className)}>
+        No activity yet
+      </div>
+    );
+  }
   
   return (
-    <div className={`p-2 ${className}`}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-1">
-          {/* Summary of active agents */}
-          <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400 mr-2">
-            Active Agents:
-          </span>
+    <div className={cn("space-y-1 relative pb-4", className)}>
+      {/* Timeline container */}
+      <div className="space-y-2">
+        {Object.entries(agentGroupedEvents).map(([agentId, events]) => {
+          const agent = agents.find(a => a.id === Number(agentId));
+          if (!agent) return null;
           
-          {/* Agents currently working */}
-          {processingCount > 0 && (
-            <span className="flex items-center text-xs text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 rounded-full px-2 py-0.5">
-              <span className="animate-pulse w-2 h-2 rounded-full bg-primary-500 mr-1.5"></span>
-              {processingCount} {processingCount === 1 ? 'agent' : 'agents'} processing
-            </span>
-          )}
-          
-          {/* Waiting agents */}
-          {waitingCount > 0 && (
-            <span className="flex items-center text-xs text-neutral-600 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-800 rounded-full px-2 py-0.5">
-              <span className="w-2 h-2 rounded-full bg-neutral-400 mr-1.5"></span>
-              {waitingCount} waiting
-            </span>
-          )}
-          
-          {/* Completed agents */}
-          {completedCount > 0 && (
-            <span className="flex items-center text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 rounded-full px-2 py-0.5">
-              <span className="w-2 h-2 rounded-full bg-green-500 mr-1.5"></span>
-              {completedCount} completed
-            </span>
-          )}
-        </div>
-        
-        {/* Controls button */}
-        <button
-          onClick={onShowDetails}
-          className="text-xs bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded px-2 py-1 transition-colors flex items-center"
-        >
-          <span className="material-icons-outlined text-sm mr-1">tune</span>
-          <span>Controls</span>
-        </button>
-      </div>
-      
-      {/* Agent pills */}
-      <div className="flex flex-wrap mt-2 gap-1.5">
-        {activeAgents.map(({ agent, status }) => (
-          <div
-            key={agent.id}
-            className={`
-              flex items-center rounded-full px-2 py-1 text-xs font-medium
-              ${status === AgentStatus.PROCESSING ? 
-                'bg-primary-100 dark:bg-primary-900/40 text-primary-800 dark:text-primary-300' : 
-                status === AgentStatus.COMPLETED ?
-                'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300' :
-                'bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-300'
-              }
-            `}
-          >
-            <AgentActivityIndicator agent={agent} status={status} size="sm" />
-            <span className="ml-1.5">{agent.name}</span>
-          </div>
-        ))}
+          return (
+            <div key={agentId} className="relative pl-6 pb-2">
+              {/* Agent color dot */}
+              <div 
+                className={cn(
+                  "absolute left-0 top-1.5 w-4 h-4 rounded-full flex items-center justify-center font-medium text-[9px] border-2 border-white dark:border-gray-900",
+                  getAgentColor(agent.type)
+                )}
+              >
+                {getAgentInitials(agent.name)}
+              </div>
+              
+              {/* Agent timeline events */}
+              <div className="space-y-1.5">
+                {events.map((event, idx) => (
+                  <div 
+                    key={`${agentId}-${idx}`} 
+                    className="text-xs flex items-start gap-1.5"
+                  >
+                    <div className="text-neutral-500 min-w-[60px] pt-0.5">
+                      {formatTime(event.timestamp)}
+                    </div>
+                    
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center pt-0.5">
+                          {getStatusIcon(event.status)}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <p className="text-xs capitalize">{event.status}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    
+                    {event.message && (
+                      <div className="flex-1 truncate">
+                        {event.message.length > 60 
+                          ? `${event.message.substring(0, 60)}...` 
+                          : event.message}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
