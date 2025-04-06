@@ -8,9 +8,11 @@ import { CodeAgent } from './codeAgent';
 import { WriterAgent } from './writerAgent';
 import { PlannerAgent } from './plannerAgent';
 import { ThinkerAgent } from './thinkerAgent';
+import { AgnoAgent } from './agnoAgent';
 import { LLMManager } from '../llm/llmManager';
 import { memoryManager } from '../memory/memory';
 import { toolManager } from '../tools/toolManager';
+import { agnoClient } from '../agno/agnoClient';
 
 class AgentManager {
   private agents: Map<number, BaseAgent> = new Map();
@@ -92,6 +94,20 @@ class AgentManager {
       maxTokens: 4000,
       tools: ['web_browser'],
       isActive: false
+    });
+    
+    // Create Agno-powered agent
+    await this.createAgent({
+      name: 'Agno Assistant',
+      description: 'Advanced assistant using the Agno framework for enhanced capabilities',
+      type: 'agno',
+      systemPrompt: 'You are an advanced assistant powered by the Agno framework. You have enhanced capabilities for memory retention, tool usage, and task completion. Your goal is to provide helpful, accurate, and relevant responses to user queries.',
+      model: 'gpt-4o',
+      provider: 'openai',
+      temperature: 70,
+      maxTokens: 4000,
+      tools: ['web_browser', 'code_execution', 'deep_research'],
+      isActive: true
     });
     
     // Create planner agent based on Genspark approach
@@ -220,6 +236,14 @@ class AgentManager {
         break;
       case 'writer':
         agent = new WriterAgent(
+          agentData,
+          this.llmManager,
+          memoryManager,
+          toolManager
+        );
+        break;
+      case 'agno':
+        agent = new AgnoAgent(
           agentData,
           this.llmManager,
           memoryManager,

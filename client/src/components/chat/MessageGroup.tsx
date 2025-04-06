@@ -126,13 +126,15 @@ export default function MessageGroup({
   // Get agent color based on type
   const getAgentColor = (type?: string): string => {
     switch(type) {
-      case 'orchestrator': return '#7c3aed'; // Violet
-      case 'planner': return '#2563eb';      // Blue
-      case 'research': return '#059669';     // Green
-      case 'code': return '#f59e0b';         // Amber
-      case 'writer': return '#db2777';       // Pink
-      case 'thinker': return '#6366f1';      // Indigo
-      default: return '#6b7280';             // Gray
+      case 'orchestrator': return '#7c3aed';        // Violet
+      case 'enhanced_orchestrator': return '#4c1d95'; // Darker Violet
+      case 'planner': return '#2563eb';             // Blue
+      case 'research': return '#059669';            // Green
+      case 'code': return '#f59e0b';                // Amber
+      case 'writer': return '#db2777';              // Pink
+      case 'thinker': return '#6366f1';             // Indigo
+      case 'agno': return '#047857';                // Emerald
+      default: return '#6b7280';                    // Gray
     }
   };
   
@@ -140,11 +142,13 @@ export default function MessageGroup({
   const getAgentIcon = (type?: string) => {
     switch(type) {
       case 'orchestrator': return <Brain className="h-3.5 w-3.5 text-primary" />;
+      case 'enhanced_orchestrator': return <LayoutDashboard className="h-3.5 w-3.5 text-primary" />;
       case 'planner': return <Clock className="h-3.5 w-3.5 text-primary" />;
       case 'research': return <Search className="h-3.5 w-3.5 text-primary" />;
       case 'code': return <Code className="h-3.5 w-3.5 text-primary" />;
       case 'writer': return <Edit className="h-3.5 w-3.5 text-primary" />;
       case 'thinker': return <Lightbulb className="h-3.5 w-3.5 text-primary" />;
+      case 'agno': return <GitBranch className="h-3.5 w-3.5 text-primary" />;
       default: return <Bot className="h-3.5 w-3.5 text-primary" />;
     }
   };
@@ -153,11 +157,13 @@ export default function MessageGroup({
   const getAgentIconForTimeline = (type?: string) => {
     switch(type) {
       case 'orchestrator': return <Brain className="h-2 w-2" />;
+      case 'enhanced_orchestrator': return <LayoutDashboard className="h-2 w-2" />;
       case 'planner': return <Clock className="h-2 w-2" />;
       case 'research': return <Search className="h-2 w-2" />;
       case 'code': return <Code className="h-2 w-2" />;
       case 'writer': return <Edit className="h-2 w-2" />;
       case 'thinker': return <Lightbulb className="h-2 w-2" />;
+      case 'agno': return <GitBranch className="h-2 w-2" />;
       default: return <Bot className="h-2 w-2" />;
     }
   };

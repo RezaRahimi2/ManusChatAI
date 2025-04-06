@@ -216,9 +216,13 @@ export default function AgentDetails({ onClose }: AgentDetailsProps) {
   const getAgentColor = (type: string) => {
     switch (type) {
       case "orchestrator": return "bg-primary-500";
+      case "enhanced_orchestrator": return "bg-primary-600";
       case "research": return "bg-secondary-400";
       case "code": return "bg-accent-500";
       case "writer": return "bg-success-500";
+      case "planner": return "bg-amber-500";
+      case "thinker": return "bg-indigo-500";
+      case "agno": return "bg-emerald-500";
       default: return "bg-neutral-500";
     }
   };
@@ -227,9 +231,13 @@ export default function AgentDetails({ onClose }: AgentDetailsProps) {
   const getAgentIcon = (type: string) => {
     switch (type) {
       case "orchestrator": return "smart_toy";
+      case "enhanced_orchestrator": return "precision_manufacturing";
       case "research": return "search";
       case "code": return "code";
       case "writer": return "edit";
+      case "planner": return "view_timeline";
+      case "thinker": return "psychology";
+      case "agno": return "memory";
       default: return "engineering";
     }
   };
