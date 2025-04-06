@@ -124,12 +124,35 @@ export class BaseAgent {
     // Get context from memory
     const contextMessages = await this.getContextMessages(workspaceId);
     
-    // Prepare messages for LLM
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...contextMessages,
-      { role: 'user', content: userMessage }
-    ];
+    // For DeepSeek models, we need to make sure system messages are properly placed
+    const isDeepSeek = this.agentData.provider === 'deepseek';
+    
+    // Extract system messages from context
+    const systemMessages = contextMessages.filter(msg => msg.role === 'system');
+    const nonSystemMessages = contextMessages.filter(msg => msg.role !== 'system');
+    
+    // Prepare messages for LLM based on provider requirements
+    let messages;
+    if (isDeepSeek) {
+      // For DeepSeek: Combine all system messages into one at the beginning
+      const allSystemContent = [
+        systemPrompt, 
+        ...systemMessages.map(msg => msg.content)
+      ].filter(content => content && content.trim().length > 0).join('\n\n');
+      
+      messages = [
+        { role: 'system', content: allSystemContent || 'You are a helpful assistant.' },
+        ...nonSystemMessages,
+        { role: 'user', content: userMessage }
+      ];
+    } else {
+      // For other providers: Standard format
+      messages = [
+        { role: 'system', content: systemPrompt },
+        ...contextMessages,
+        { role: 'user', content: userMessage }
+      ];
+    }
     
     // Get available tools
     const tools = await this.toolManager.getToolsForAgent(this.agentData);

@@ -494,25 +494,31 @@ export class LLMManager {
       // Set default model if not specified
       const actualModel = model || 'deepseek-chat';
       
-      // Fix for DeepSeek API requiring system message at the beginning
-      let processedMessages = [...messages];
+      // DeepSeek API has strict requirements about system messages
+      // Extract all system messages and non-system messages to ensure proper ordering
+      const systemMessages = messages.filter(msg => msg.role === 'system');
+      const nonSystemMessages = messages.filter(msg => msg.role !== 'system');
       
-      // For all DeepSeek models, ensure system message is first
-      if (actualModel.startsWith('deepseek')) {
-        // Find system message if it exists
-        const systemMessageIndex = processedMessages.findIndex(msg => msg.role === 'system');
+      let processedMessages = [];
+      
+      // If there are system messages, combine them into one
+      if (systemMessages.length > 0) {
+        const combinedSystemContent = systemMessages
+          .map(msg => msg.content)
+          .filter(content => content && content.trim().length > 0)
+          .join('\n\n');
         
-        if (systemMessageIndex !== -1 && systemMessageIndex !== 0) {
-          // If system message exists but isn't first, move it to the front
-          const systemMessage = processedMessages.splice(systemMessageIndex, 1)[0];
-          processedMessages.unshift(systemMessage);
-        } else if (systemMessageIndex === -1) {
-          // If no system message exists, add a default one
-          processedMessages.unshift({
-            role: 'system',
-            content: 'You are a helpful assistant specialized in reasoning and problem-solving.'
-          });
-        }
+        // Create a new messages array with the system message first
+        processedMessages = [
+          { role: 'system', content: combinedSystemContent || 'You are a helpful assistant.' },
+          ...nonSystemMessages
+        ];
+      } else {
+        // If no system message exists, add a default one
+        processedMessages = [
+          { role: 'system', content: 'You are a helpful assistant specialized in reasoning and problem-solving.' },
+          ...nonSystemMessages
+        ];
       }
       
       const response = await axios.post(
