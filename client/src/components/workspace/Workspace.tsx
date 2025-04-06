@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import ChatInput from "@/components/chat/ChatInput";
 import ChatMessage from "@/components/chat/ChatMessage";
 import ThinkingMessage from "@/components/chat/ThinkingMessage";
+import { ThinkingSkeletonMessage } from "@/components/chat/ThinkingSkeletonMessage";
+import { AgentMessageSkeleton } from "@/components/chat/AgentMessageSkeleton";
 import MessageGroup from "@/components/chat/MessageGroup";
 import { AgentTimeline, TimelineDetailView } from "@/components/workspace";
 import AgentInteractionFlow from "@/components/workspace/AgentInteractionFlow";
@@ -244,8 +246,10 @@ export default function Workspace({ workspaceId }: WorkspaceProps) {
   
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+      <div className="flex-1 flex flex-col p-4 space-y-4">
+        <AgentMessageSkeleton />
+        <AgentMessageSkeleton />
+        <ThinkingSkeletonMessage showTechnicalView={false} />
       </div>
     );
   }
@@ -488,7 +492,11 @@ export default function Workspace({ workspaceId }: WorkspaceProps) {
           ))
         )}
         
-        {thinking && <ThinkingMessage agent={thinkingAgent} content={thinkingContent} showTechnicalView={showTechnicalView} />}
+        {thinking && (
+          thinkingContent ? 
+            <ThinkingMessage agent={thinkingAgent} content={thinkingContent} showTechnicalView={showTechnicalView} /> :
+            <ThinkingSkeletonMessage agent={thinkingAgent} showTechnicalView={showTechnicalView} className="mb-4" />
+        )}
         
         {/* Technical View Toggle Button */}
         {messages.length > 0 && (
