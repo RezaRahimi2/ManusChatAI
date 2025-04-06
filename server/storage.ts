@@ -91,7 +91,7 @@ export class MemStorage implements IStorage {
       { provider: 'lmstudio', baseUrl: 'http://localhost:1234/v1', isEnabled: true },
       { provider: 'perplexity', isEnabled: false },
       { provider: 'xai', isEnabled: false },
-      { provider: 'deepseek', apiKey: 'sk-ba90a58c19e74eb394fe4595f6734785', isEnabled: true }
+      { provider: 'deepseek', apiKey: 'sk-ba90a58c19e74eb394fe4595f6734785', isEnabled: true, models: ['deepseek-chat', 'deepseek-coder', 'deepseek-llm-7b-chat', 'deepseek-reasoner'] }
     ];
     
     for (const provider of defaultProviders) {
