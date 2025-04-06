@@ -22,14 +22,18 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AgentProvider>
-        <WorkspaceProvider>
-          <Router />
-          <Toaster />
-        </WorkspaceProvider>
-      </AgentProvider>
-    </QueryClientProvider>
+    <div className="dark">
+      <QueryClientProvider client={queryClient}>
+        <AgentProvider>
+          <WorkspaceProvider>
+            <div className="min-h-screen bg-background text-foreground">
+              <Router />
+              <Toaster />
+            </div>
+          </WorkspaceProvider>
+        </AgentProvider>
+      </QueryClientProvider>
+    </div>
   );
 }
 
