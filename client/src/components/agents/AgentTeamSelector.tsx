@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import AgentActivityIndicator from './AgentActivityIndicator';
+import AgentActivityIndicator, { AgentStatus } from './AgentActivityIndicator';
 
 interface AgentTeamSelectorProps {
   agents: Agent[];
@@ -165,7 +165,7 @@ export default function AgentTeamSelector({
                       }}
                     >
                       <div className="flex items-center gap-2">
-                        <AgentActivityIndicator agent={agent} isActive={false} />
+                        <AgentActivityIndicator status="waiting" />
                         <div>
                           <div className="text-sm font-medium">{agent.name}</div>
                           <div className="text-xs text-gray-500">{agent.type}</div>

@@ -4,8 +4,9 @@ import { cn } from '@/lib/utils';
 import { Loader2, ChevronDown, ChevronUp, BrainCircuit } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Markdown } from '@/components/ui/markdown';
+import Markdown from '@/components/ui/markdown';
 import AgentActivityIndicator from '@/components/agents/AgentActivityIndicator';
+import { AgentStatus } from '@/components/agents/AgentActivityIndicator';
 
 interface ThinkingMessageProps {
   agent?: Agent;
@@ -35,7 +36,7 @@ export default function ThinkingMessage({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {agent ? (
-            <AgentActivityIndicator agent={agent} isActive={true} />
+            <AgentActivityIndicator status="processing" />
           ) : (
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />

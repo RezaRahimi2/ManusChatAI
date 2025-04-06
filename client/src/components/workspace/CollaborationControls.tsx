@@ -17,28 +17,32 @@ import {
 export type CollaborationMode = 'sequential' | 'parallel' | 'adaptive' | 'expert_driven';
 
 interface CollaborationControlsProps {
-  mode: CollaborationMode;
-  isAuto: boolean;
-  enableChainOfThought: boolean;
-  onModeChange: (mode: CollaborationMode) => void;
-  onAutoChange: (isAuto: boolean) => void;
-  onChainOfThoughtChange: (enable: boolean) => void;
-  onRestart: () => void;
+  onConfigChange: (config: any) => void;
+  availableAgents: any[];
   className?: string;
+  mode?: CollaborationMode;
+  isAuto?: boolean;
+  enableChainOfThought?: boolean;
+  onModeChange?: (mode: CollaborationMode) => void;
+  onAutoChange?: (isAuto: boolean) => void;
+  onChainOfThoughtChange?: (enable: boolean) => void;
+  onRestart?: () => void;
 }
 
 /**
  * Controls for configuring agent collaboration settings
  */
 export default function CollaborationControls({
-  mode,
-  isAuto,
-  enableChainOfThought,
-  onModeChange,
-  onAutoChange,
-  onChainOfThoughtChange,
-  onRestart,
-  className = ''
+  onConfigChange,
+  availableAgents,
+  className = '',
+  mode = 'adaptive',
+  isAuto = true,
+  enableChainOfThought = true,
+  onModeChange = (mode) => { if (onConfigChange) onConfigChange({ mode }); },
+  onAutoChange = (isAuto) => { if (onConfigChange) onConfigChange({ isAuto }); },
+  onChainOfThoughtChange = (enable) => { if (onConfigChange) onConfigChange({ enableChainOfThought: enable }); },
+  onRestart = () => { if (onConfigChange) onConfigChange({ restart: true }); }
 }: CollaborationControlsProps) {
   // Descriptions for different collaboration modes
   const modeDescriptions: Record<CollaborationMode, { description: string, icon: React.ReactNode }> = {

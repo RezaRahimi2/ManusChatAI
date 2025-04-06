@@ -1,8 +1,8 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { cn } from '@/lib/utils';
 
 interface MarkdownProps {
@@ -10,76 +10,100 @@ interface MarkdownProps {
   className?: string;
 }
 
-export function Markdown({ children, className }: MarkdownProps) {
+/**
+ * Markdown renderer with syntax highlighting and GitHub flavored markdown
+ */
+export default function Markdown({ 
+  children, 
+  className 
+}: MarkdownProps) {
   return (
-    <div className={cn("prose prose-sm dark:prose-invert max-w-none", className)}>
+    <div className={cn('prose prose-sm dark:prose-invert max-w-none', className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code: ({ className, children, ...props }: any) => {
+          code(props: any) {
+            const { className, children, inline } = props;
             const match = /language-(\w+)/.exec(className || '');
-            const inline = !match;
+            const language = match && match[1] ? match[1] : '';
             
-            return !inline ? (
+            return !inline && match ? (
               <SyntaxHighlighter
-                style={vscDarkPlus as any}
-                language={match ? match[1] : ''}
-                customStyle={{ 
-                  borderRadius: '0.375rem',
-                  margin: '1rem 0'
-                }}
+                style={vscDarkPlus}
+                language={language}
                 PreTag="div"
+                className="rounded-md text-sm"
+                showLineNumbers={true}
+                customStyle={{
+                  margin: '1.5em 0',
+                  borderRadius: '0.375rem',
+                }}
                 {...props}
               >
                 {String(children).replace(/\n$/, '')}
               </SyntaxHighlighter>
             ) : (
-              <code 
-                className="bg-neutral-100 dark:bg-neutral-900 px-1 py-0.5 rounded font-mono text-sm"
-                {...props}
-              >
+              <code className={cn("bg-muted px-1.5 py-0.5 rounded-sm text-sm font-mono", className)} {...props}>
                 {children}
               </code>
             );
           },
-          // Custom table styling
-          table: ({ children }: any) => (
-            <div className="overflow-x-auto my-6">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                {children}
-              </table>
-            </div>
-          ),
-          // Custom link styling
-          a: ({ children, href }: any) => (
-            <a
-              href={href}
-              className="text-blue-600 dark:text-blue-400 hover:underline"
-              target="_blank"
+          // Enhance links
+          a: ({ href, children, ...props }) => (
+            <a 
+              href={href} 
+              target="_blank" 
               rel="noopener noreferrer"
+              className="text-primary hover:underline inline-flex items-center"
+              {...props}
             >
               {children}
             </a>
           ),
-          // Custom blockquote styling
-          blockquote: ({ children }: any) => (
-            <blockquote
-              className="border-l-4 border-neutral-300 dark:border-neutral-700 pl-4 py-1 my-4 text-neutral-600 dark:text-neutral-400"
+          // Add rounded style to images
+          img: ({ src, alt, ...props }) => (
+            <img 
+              src={src} 
+              alt={alt || ''} 
+              className="rounded-md" 
+              {...props} 
+            />
+          ),
+          // Style tables
+          table: ({ children, ...props }) => (
+            <div className="overflow-x-auto my-4">
+              <table className="border-collapse table-auto w-full text-sm" {...props}>
+                {children}
+              </table>
+            </div>
+          ),
+          // Style table headers
+          th: ({ children, ...props }) => (
+            <th 
+              className="border-b border-muted-foreground/20 px-4 py-2 text-left font-medium" 
+              {...props}
+            >
+              {children}
+            </th>
+          ),
+          // Style table cells
+          td: ({ children, ...props }) => (
+            <td 
+              className="border-b border-muted-foreground/10 px-4 py-2" 
+              {...props}
+            >
+              {children}
+            </td>
+          ),
+          // Enhance blockquotes
+          blockquote: ({ children, ...props }) => (
+            <blockquote 
+              className="border-l-4 border-muted-foreground/30 pl-4 italic text-muted-foreground" 
+              {...props}
             >
               {children}
             </blockquote>
           ),
-          // Custom list styling
-          ul: ({ children }: any) => (
-            <ul className="list-disc pl-6 my-4">
-              {children}
-            </ul>
-          ),
-          ol: ({ children }: any) => (
-            <ol className="list-decimal pl-6 my-4">
-              {children}
-            </ol>
-          )
         }}
       >
         {children}
@@ -87,5 +111,3 @@ export function Markdown({ children, className }: MarkdownProps) {
     </div>
   );
 }
-
-export default Markdown;

@@ -1,22 +1,16 @@
-import React, { useState } from 'react';
-import { Agent, Message } from '@shared/schema';
+import React, { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronRight, Clock } from 'lucide-react';
-import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Markdown } from '@/components/ui/markdown';
-import ThinkingMessage from './ThinkingMessage';
-import AgentTimeline from '@/components/workspace/AgentTimeline';
-import AgentActivityIndicator, { AgentStatus } from '@/components/agents/AgentActivityIndicator';
-import { format } from 'date-fns';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Avatar } from '@/components/ui/avatar';
+import { ChevronDown, ChevronRight, User, Bot, Clock } from 'lucide-react';
+import { Agent, Message } from '@shared/schema';
+import Markdown from '@/components/ui/markdown';
+import { AgentStatus } from '@/components/agents/AgentActivityIndicator';
 
 interface MessageGroupProps {
   messages: Message[];
-  agents: Agent[];
-  workspaceId?: number;
   collaborationId?: string;
   getAgent?: (id: number) => Agent | undefined;
   showTechnicalView?: boolean;
@@ -36,209 +30,290 @@ interface TimelineStep {
  */
 export default function MessageGroup({
   messages,
-  agents,
-  workspaceId,
   collaborationId,
   getAgent,
   showTechnicalView = false,
-  className = ''
+  className
 }: MessageGroupProps) {
   const [expanded, setExpanded] = useState(true);
-  const [activeTab, setActiveTab] = useState<'messages' | 'timeline'>('messages');
+  const [activeTab, setActiveTab] = useState<string>('unified');
   
-  // Get the user message (trigger) for this group
-  const userMessage = messages.find(m => m.role === 'user');
+  // Group and organize messages
+  const {
+    userMessage,
+    agentMessages,
+    timelineSteps,
+    agents
+  } = useMemo(() => {
+    if (!messages.length) {
+      return { userMessage: null, agentMessages: [], timelineSteps: [], agents: [] };
+    }
+    
+    // Extract user message (first message in the group)
+    const userMsg = messages[0].role === 'user' ? messages[0] : null;
+    
+    // Extract agent messages and build timeline
+    const agentMsgs: Message[] = [];
+    const timeline: TimelineStep[] = [];
+    const activeAgentIds = new Set<number>();
+    
+    // Process all non-user messages
+    messages.forEach(msg => {
+      if (msg.role !== 'user' && msg.agentId) {
+        // Add to agent messages
+        agentMsgs.push(msg);
+        
+        // Track active agents
+        activeAgentIds.add(msg.agentId);
+        
+        // Determine message type from metadata
+        const messageType = typeof msg.metadata === 'object' && msg.metadata 
+          ? (msg.metadata as any)?.type 
+          : null;
+          
+        // Add to timeline
+        timeline.push({
+          id: `${msg.id}-${msg.agentId}-${msg.createdAt}`,
+          agentId: msg.agentId,
+          timestamp: new Date(msg.createdAt),
+          content: msg.content,
+          status: messageType === 'thinking' ? 'thinking' : 
+                 messageType === 'error' ? 'error' : 'completed'
+        });
+      }
+    });
+    
+    // Get unique agents with names
+    const uniqueAgents: Agent[] = [];
+    if (getAgent) {
+      activeAgentIds.forEach(id => {
+        const agent = getAgent(id);
+        if (agent) {
+          uniqueAgents.push(agent);
+        }
+      });
+    }
+    
+    // Sort timeline by timestamp
+    timeline.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    
+    return {
+      userMessage: userMsg,
+      agentMessages: agentMsgs,
+      timelineSteps: timeline,
+      agents: uniqueAgents
+    };
+  }, [messages, getAgent]);
   
-  // Get all agent messages (responses)
-  const agentMessages = messages.filter(m => 
-    m.role === 'assistant' || m.role === 'thinking'
-  );
-  
-  // Get thinking messages
-  const thinkingMessages = messages.filter(m => m.role === 'thinking');
-  
-  // Get final responses
-  const finalResponses = messages.filter(m => 
-    m.role === 'assistant' && m.metadata && 
-    typeof m.metadata === 'object' && 
-    (m.metadata as any).final === true
-  );
-  
-  // Function to format timestamps
-  const formatTime = (timestamp: number): string => {
-    return format(new Date(timestamp), 'h:mm a');
+  // Format time for display
+  const formatTime = (timestamp: Date | number | string): string => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
   
-  // Generate timeline steps
-  const timelineSteps: TimelineStep[] = messages
-    .filter(msg => msg.agentId !== null)
-    .map(msg => {
-      let status: TimelineStep['status'] = 'completed';
-      
-      if (msg.role === 'thinking') {
-        status = 'thinking';
-      } else if (msg.metadata && typeof msg.metadata === 'object') {
-        const meta = msg.metadata as Record<string, any>;
-        if (meta.status === 'error') status = 'error';
-        if (meta.status === 'waiting') status = 'waiting';
-      }
-      
-      return {
-        id: `${msg.id}`,
-        agentId: msg.agentId!,
-        timestamp: new Date(msg.createdAt),
-        content: msg.content,
-        status
-      };
-    });
-  
-  // Check if any agents are still thinking
-  const activeAgentIds = new Set(
-    thinkingMessages
-      .filter(m => !finalResponses.some(r => r.agentId === m.agentId))
-      .map(m => m.agentId)
-      .filter(Boolean) as number[]
-  );
+  // If no user message or agent messages, don't render
+  if (!userMessage && agentMessages.length === 0) {
+    return null;
+  }
   
   return (
-    <Card className={cn("w-full", className)}>
-      {/* Header with user message */}
-      <div 
-        className={cn(
-          "flex items-start p-3 gap-3 cursor-pointer",
-          !expanded && "border-b-0"
-        )}
-        onClick={() => setExpanded(!expanded)}
-      >
-        {/* User avatar */}
-        <Avatar className="h-8 w-8 mt-1">
-          <div className="flex h-full w-full items-center justify-center bg-blue-100 text-blue-600 dark:bg-blue-800 dark:text-blue-300">
-            U
-          </div>
-        </Avatar>
-        
-        <div className="flex-1 min-w-0">
-          {/* User info & timestamp */}
-          <div className="flex items-center justify-between mb-1 text-sm">
-            <div className="font-medium">You</div>
-            <div className="text-xs text-muted-foreground flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {userMessage && formatTime(userMessage.createdAt)}
+    <div className={cn('space-y-4 py-4', className)}>
+      {/* User message */}
+      {userMessage && (
+        <div className="flex items-start gap-3">
+          <Avatar className="bg-primary/10 mt-1">
+            <User className="h-5 w-5 text-primary" />
+          </Avatar>
+          <div className="flex-1 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">You</span>
+              <span className="text-xs text-muted-foreground">
+                {formatTime(userMessage.createdAt)}
+              </span>
+            </div>
+            <div className="text-sm">
+              <Markdown>{userMessage.content}</Markdown>
             </div>
           </div>
-          
-          {/* User message content - always visible */}
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            {userMessage && <Markdown>{userMessage.content}</Markdown>}
-          </div>
-          
-          {/* Active agents indicator */}
-          {activeAgentIds.size > 0 && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {agents
-                .filter(a => activeAgentIds.has(a.id))
-                .map(agent => (
-                  <AgentActivityIndicator 
-                    key={agent.id}
-                    agent={agent} 
-                    isActive={true}
-                    currentTools={[]}
-                  />
-                ))
-              }
-            </div>
-          )}
-        </div>
-        
-        {/* Expand/collapse button */}
-        <Button variant="ghost" size="icon" className="h-8 w-8 mt-1" onClick={e => {
-          e.stopPropagation();
-          setExpanded(!expanded);
-        }}>
-          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        </Button>
-      </div>
-      
-      {/* Expandable content with agent responses */}
-      {expanded && (
-        <div className="px-3 pb-3">
-          <Separator className="mb-3" />
-          
-          {/* Tabs for different views */}
-          <Tabs 
-            value={activeTab} 
-            onValueChange={(value) => setActiveTab(value as 'messages' | 'timeline')}
-            className="w-full"
-          >
-            <TabsList className="mb-2">
-              <TabsTrigger value="messages" className="text-xs">Messages</TabsTrigger>
-              <TabsTrigger value="timeline" className="text-xs">Timeline</TabsTrigger>
-            </TabsList>
-            
-            {/* Messages tab content */}
-            <TabsContent value="messages" className="space-y-3 mt-0">
-              {thinkingMessages.map(message => {
-                const agent = agents.find(a => a.id === message.agentId);
-                if (!agent) return null;
-                
-                // Skip if there's a final response from this agent
-                if (finalResponses.some(r => r.agentId === message.agentId)) {
-                  return null;
-                }
-                
-                return (
-                  <ThinkingMessage 
-                    key={message.id}
-                    agent={agent}
-                    content={message.content}
-                  />
-                );
-              })}
-              
-              {finalResponses.map(message => {
-                const agent = agents.find(a => a.id === message.agentId);
-                if (!agent) return null;
-                
-                return (
-                  <div key={message.id} className="flex items-start gap-3">
-                    {/* Agent avatar/indicator */}
-                    <div className="mt-1">
-                      <AgentActivityIndicator agent={agent} isActive={false} />
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      {/* Agent info & timestamp */}
-                      <div className="flex items-center justify-between mb-1 text-sm">
-                        <div className="font-medium">{agent.name}</div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {formatTime(message.createdAt)}
-                        </div>
-                      </div>
-                      
-                      {/* Agent message content */}
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <Markdown>{message.content}</Markdown>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              
-              {agentMessages.length === 0 && (
-                <div className="text-center text-sm text-muted-foreground py-6">
-                  Waiting for agent responses...
-                </div>
-              )}
-            </TabsContent>
-            
-            {/* Timeline tab content */}
-            <TabsContent value="timeline" className="mt-0">
-              <AgentTimeline agents={agents} messages={messages} />
-            </TabsContent>
-          </Tabs>
         </div>
       )}
-    </Card>
+      
+      {/* Agent responses section */}
+      {agentMessages.length > 0 && (
+        <Card className="overflow-hidden">
+          {/* Header with expand/collapse */}
+          <div 
+            className="flex items-center justify-between p-3 bg-muted cursor-pointer"
+            onClick={() => setExpanded(!expanded)}
+          >
+            <div className="flex items-center gap-2">
+              <Bot className="h-4 w-4" />
+              <h3 className="text-sm font-medium">Agent Collaboration {collaborationId && `#${collaborationId}`}</h3>
+            </div>
+            <Button variant="ghost" size="icon" className="h-6 w-6">
+              {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </Button>
+          </div>
+          
+          {/* View options tabs */}
+          {expanded && (
+            <>
+              <div className="border-b">
+                <Tabs defaultValue="unified" value={activeTab} onValueChange={setActiveTab}>
+                  <TabsList className="w-full justify-start h-10 px-3">
+                    <TabsTrigger value="unified" className="text-xs">
+                      Unified View
+                    </TabsTrigger>
+                    <TabsTrigger value="agents" className="text-xs">
+                      By Agent
+                    </TabsTrigger>
+                    <TabsTrigger value="timeline" className="text-xs flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5" />
+                      <span>Timeline</span>
+                    </TabsTrigger>
+                    {showTechnicalView && (
+                      <TabsTrigger value="technical" className="text-xs">
+                        Technical View
+                      </TabsTrigger>
+                    )}
+                  </TabsList>
+                </Tabs>
+              </div>
+              
+              {/* Unified view */}
+              <TabsContent value="unified" className="p-4 space-y-4">
+                {/* Combine all agent messages into a unified response */}
+                {agentMessages
+                  .filter(msg => !(typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking'))
+                  .map((message, index) => {
+                    const agent = getAgent?.(message.agentId || 0);
+                    return (
+                      <div key={message.id || index} className="space-y-2">
+                        {agent && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium">{agent.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatTime(message.createdAt)}
+                            </span>
+                          </div>
+                        )}
+                        <div className="text-sm">
+                          <Markdown>{message.content}</Markdown>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </TabsContent>
+              
+              {/* Agent view */}
+              <TabsContent value="agents" className="p-0">
+                <Tabs defaultValue={agents[0]?.id.toString() || "0"}>
+                  <TabsList className="w-full justify-start p-2 overflow-x-auto flex-nowrap h-auto bg-muted/50">
+                    {agents.map(agent => (
+                      <TabsTrigger 
+                        key={agent.id} 
+                        value={agent.id.toString()}
+                        className="text-xs whitespace-nowrap"
+                      >
+                        {agent.name}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                  
+                  {agents.map(agent => (
+                    <TabsContent key={agent.id} value={agent.id.toString()} className="p-4 space-y-4">
+                      {agentMessages
+                        .filter(msg => msg.agentId === agent.id && !(typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking'))
+                        .map((message, index) => (
+                          <div key={message.id || index} className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">
+                                {formatTime(message.createdAt)}
+                              </span>
+                            </div>
+                            <div className="text-sm">
+                              <Markdown>{message.content}</Markdown>
+                            </div>
+                          </div>
+                        ))}
+                        
+                      {/* Show thinking if available */}
+                      {agentMessages
+                        .filter(msg => msg.agentId === agent.id && typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking')
+                        .map((message, index) => (
+                          <div key={`thinking-${message.id || index}`} className="mt-4 p-3 bg-muted/50 rounded border text-sm">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-medium">Reasoning Process</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              <Markdown>{message.content}</Markdown>
+                            </div>
+                          </div>
+                        ))}
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              </TabsContent>
+              
+              {/* Timeline view */}
+              <TabsContent value="timeline" className="p-0">
+                <div className="p-2">
+                  <div className="space-y-0">
+                    {timelineSteps.map((step, index) => {
+                      const agent = getAgent?.(step.agentId);
+                      
+                      return (
+                        <div key={step.id} className="relative pl-6 ml-3 pb-4 pt-1 border-l">
+                          {/* Timeline dot */}
+                          <div 
+                            className={cn(
+                              "absolute left-[-4px] top-2 w-2 h-2 rounded-full",
+                              step.status === 'thinking' ? 'bg-blue-500' :
+                              step.status === 'completed' ? 'bg-green-500' :
+                              step.status === 'error' ? 'bg-red-500' :
+                              'bg-neutral-400'
+                            )}
+                          />
+                          
+                          {/* Step details */}
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-medium">
+                                {agent?.name || `Agent #${step.agentId}`}
+                              </span>
+                              <span className="text-muted-foreground text-xs">
+                                {formatTime(step.timestamp)}
+                              </span>
+                            </div>
+                            <div className={cn(
+                              "text-xs p-2 rounded",
+                              step.status === 'thinking' ? 'bg-blue-50 dark:bg-blue-950/30' :
+                              step.status === 'completed' ? 'bg-neutral-50 dark:bg-neutral-900/30' :
+                              step.status === 'error' ? 'bg-red-50 dark:bg-red-950/30' :
+                              'bg-neutral-50 dark:bg-neutral-900/30'
+                            )}>
+                              <Markdown>{step.content}</Markdown>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </TabsContent>
+              
+              {/* Technical view for debugging */}
+              {showTechnicalView && (
+                <TabsContent value="technical" className="p-4">
+                  <pre className="bg-neutral-950 text-neutral-50 p-3 rounded text-xs overflow-auto">
+                    {JSON.stringify(messages, null, 2)}
+                  </pre>
+                </TabsContent>
+              )}
+            </>
+          )}
+        </Card>
+      )}
+    </div>
   );
 }

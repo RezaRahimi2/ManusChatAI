@@ -5,6 +5,7 @@ import ChatMessage from "@/components/chat/ChatMessage";
 import ThinkingMessage from "@/components/chat/ThinkingMessage";
 import MessageGroup from "@/components/chat/MessageGroup";
 import AgentTimeline from "@/components/workspace/AgentTimeline";
+import AgentInteractionFlow from "@/components/workspace/AgentInteractionFlow";
 import CollaborationControls from "@/components/workspace/CollaborationControls";
 import { useSocket, addMessageListener, removeMessageListener, sendChatMessage, joinWorkspace } from "@/lib/socket";
 import { useAgentContext } from "@/context/AgentContext";
@@ -301,6 +302,17 @@ export default function Workspace({ workspaceId }: WorkspaceProps) {
               }))}
             onShowDetails={toggleControls}
           />
+          
+          {/* Add interactive agent flow visualizer for active collaborations */}
+          {currentCollaboration && (
+            <AgentInteractionFlow
+              activeAgents={Array.from(activeAgents.entries())
+                .filter(([id]) => getAgentById(id) !== undefined)}
+              getAgent={getAgentById}
+              collaborationId={currentCollaboration}
+              className="p-4"
+            />
+          )}
         </div>
       )}
       
