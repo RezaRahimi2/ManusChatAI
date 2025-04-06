@@ -5,6 +5,13 @@ import { ToolManager } from '../tools/toolManager';
 import { storage } from '../storage';
 import { broadcastToWorkspace } from '../socket';
 
+// Define interface for LLM messages to match the expected format
+interface LLMMessage {
+  role: string;
+  content: string;
+  tool_calls?: any[];
+}
+
 export class BaseAgent {
   protected agentData: Agent;
   protected llmManager: LLMManager;
@@ -184,8 +191,17 @@ export class BaseAgent {
       });
     }
     
-    // Extract response content
-    const responseContent = result.choices[0].message.content;
+    // Check if the response contains any tool calls
+    const resultMessage = result.choices[0].message;
+    const hasToolCalls = resultMessage.tool_calls && resultMessage.tool_calls.length > 0;
+    
+    if (hasToolCalls) {
+      // Process the tool calls
+      return this.processToolCalls(workspaceId, resultMessage, messages);
+    }
+    
+    // No tool calls, just extract response content
+    const responseContent = resultMessage.content;
     
     // Save to memory
     const responseMessage: Message = {
@@ -209,6 +225,184 @@ export class BaseAgent {
     });
     
     return responseContent;
+  }
+  
+  /**
+   * Process tool calls returned by the LLM
+   */
+  private async processToolCalls(workspaceId: number, resultMessage: any, originalMessages: LLMMessage[]): Promise<string> {
+    const toolCalls = resultMessage.tool_calls || [];
+    
+    // Create a thinking message for tool execution
+    const thinkingMessage: Message = {
+      id: Date.now(),
+      workspaceId,
+      role: 'thinking',
+      content: `Executing ${toolCalls.length} tool(s)...`,
+      agentId: this.getId(),
+      createdAt: Date.now(),
+      metadata: {
+        isThinking: true,
+        toolCalls: toolCalls.map((tc: any) => tc.function.name)
+      }
+    };
+    
+    // Save thinking message - shows the user what's happening
+    await storage.createMessage(thinkingMessage);
+    
+    // Broadcast thinking status message
+    broadcastToWorkspace(workspaceId, {
+      type: 'message',
+      workspaceId,
+      message: thinkingMessage
+    });
+    
+    // Process each tool call
+    const toolResults = [];
+    
+    for (const toolCall of toolCalls) {
+      try {
+        if (toolCall.function && toolCall.function.name) {
+          const toolName = toolCall.function.name;
+          const toolInstance = this.toolManager.getToolByType(toolName);
+          
+          if (toolInstance) {
+            // Parse the parameters if provided as a string
+            let params = toolCall.function.arguments;
+            if (typeof params === 'string') {
+              try {
+                params = JSON.parse(params);
+              } catch (error) {
+                console.warn(`Could not parse tool arguments as JSON: ${params}`);
+                // Keep as string if not valid JSON
+              }
+            }
+            
+            // Execute the tool
+            console.log(`Executing tool ${toolName} with params:`, params);
+            const result = await toolInstance.execute(params);
+            
+            // Record the tool result
+            toolResults.push({
+              tool_call_id: toolCall.id,
+              role: 'tool',
+              name: toolName,
+              content: typeof result === 'string' ? result : JSON.stringify(result)
+            });
+            
+            // Create a tool execution message for memory
+            const toolExecutionMessage: Message = {
+              id: Date.now() + toolResults.length,
+              workspaceId,
+              role: 'tool',
+              content: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
+              agentId: this.getId(),
+              createdAt: Date.now(),
+              metadata: {
+                toolName,
+                toolCallId: toolCall.id
+              }
+            };
+            
+            // Save tool execution to memory
+            await storage.createMessage(toolExecutionMessage);
+            await this.saveToMemory(workspaceId, toolExecutionMessage);
+            
+            // Broadcast tool execution message
+            broadcastToWorkspace(workspaceId, {
+              type: 'message',
+              workspaceId,
+              message: toolExecutionMessage
+            });
+          } else {
+            throw new Error(`Tool ${toolName} not found`);
+          }
+        } else {
+          throw new Error('Invalid tool call format');
+        }
+      } catch (error) {
+        console.error(`Error executing tool:`, error);
+        
+        // Record the error as a tool result
+        toolResults.push({
+          tool_call_id: toolCall.id || 'unknown',
+          role: 'tool',
+          name: toolCall.function?.name || 'unknown',
+          content: `Error: ${error instanceof Error ? error.message : String(error)}`
+        });
+        
+        // Create an error message for the tool execution
+        const errorMessage: Message = {
+          id: Date.now() + toolResults.length,
+          workspaceId,
+          role: 'system',
+          content: `Error executing tool ${toolCall.function?.name || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
+          agentId: this.getId(),
+          createdAt: Date.now(),
+          metadata: {
+            error: true,
+            toolError: true,
+            toolName: toolCall.function?.name
+          }
+        };
+        
+        // Save error message to memory
+        await storage.createMessage(errorMessage);
+        await this.saveToMemory(workspaceId, errorMessage);
+        
+        // Broadcast error message
+        broadcastToWorkspace(workspaceId, {
+          type: 'message',
+          workspaceId,
+          message: errorMessage
+        });
+      }
+    }
+    
+    // Add the assistant's message and tool results to the original messages
+    const updatedMessages = [
+      ...originalMessages,
+      {
+        role: 'assistant',
+        content: resultMessage.content,
+        tool_calls: toolCalls
+      },
+      ...toolResults
+    ];
+    
+    // Generate a final response based on tool results
+    const finalResult = await this.llmManager.generateResponse({
+      provider: this.agentData.provider,
+      model: this.agentData.model,
+      messages: updatedMessages,
+      temperature: this.agentData.temperature ? this.agentData.temperature / 100 : 0.7,
+      maxTokens: this.agentData.maxTokens || undefined
+    });
+    
+    // Save the final response
+    const finalResponseMessage: Message = {
+      id: Date.now() + 1000, // Ensure unique ID
+      workspaceId,
+      role: 'assistant',
+      content: finalResult.choices[0].message.content,
+      agentId: this.getId(),
+      createdAt: Date.now(),
+      metadata: {
+        usedTools: toolCalls.map((tc: any) => tc.function.name)
+      }
+    };
+    
+    await storage.createMessage(finalResponseMessage);
+    await this.saveToMemory(workspaceId, finalResponseMessage);
+    
+    // Broadcast the final response
+    broadcastToWorkspace(workspaceId, {
+      type: 'message',
+      workspaceId,
+      message: finalResponseMessage
+    });
+    
+    return finalResponseMessage.content;
   }
   
   async process(workspaceId: number, userMessage: string): Promise<void> {
