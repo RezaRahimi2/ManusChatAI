@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
-import { ChevronDown, ChevronRight, User, Bot, Clock } from 'lucide-react';
+import { ChevronDown, ChevronRight, User, Bot, Clock, Brain, Search, Code, Edit, Lightbulb } from 'lucide-react';
 import { Agent, Message } from '@shared/schema';
 import Markdown from '@/components/ui/markdown';
 import { AgentStatus } from '@/components/agents/AgentActivityIndicator';
@@ -119,6 +119,115 @@ export default function MessageGroup({
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
   
+  // Get agent color based on type
+  const getAgentColor = (type?: string): string => {
+    switch(type) {
+      case 'orchestrator': return '#7c3aed'; // Violet
+      case 'planner': return '#2563eb';      // Blue
+      case 'research': return '#059669';     // Green
+      case 'code': return '#f59e0b';         // Amber
+      case 'writer': return '#db2777';       // Pink
+      case 'thinker': return '#6366f1';      // Indigo
+      default: return '#6b7280';             // Gray
+    }
+  };
+  
+  // Get agent icon component based on type
+  const getAgentIcon = (type?: string) => {
+    switch(type) {
+      case 'orchestrator': return <Brain className="h-3.5 w-3.5 text-primary" />;
+      case 'planner': return <Clock className="h-3.5 w-3.5 text-primary" />;
+      case 'research': return <Search className="h-3.5 w-3.5 text-primary" />;
+      case 'code': return <Code className="h-3.5 w-3.5 text-primary" />;
+      case 'writer': return <Edit className="h-3.5 w-3.5 text-primary" />;
+      case 'thinker': return <Lightbulb className="h-3.5 w-3.5 text-primary" />;
+      default: return <Bot className="h-3.5 w-3.5 text-primary" />;
+    }
+  };
+  
+  // Get smaller agent icon for timeline view
+  const getAgentIconForTimeline = (type?: string) => {
+    switch(type) {
+      case 'orchestrator': return <Brain className="h-2 w-2" />;
+      case 'planner': return <Clock className="h-2 w-2" />;
+      case 'research': return <Search className="h-2 w-2" />;
+      case 'code': return <Code className="h-2 w-2" />;
+      case 'writer': return <Edit className="h-2 w-2" />;
+      case 'thinker': return <Lightbulb className="h-2 w-2" />;
+      default: return <Bot className="h-2 w-2" />;
+    }
+  };
+  
+  // Get action label for timeline specifically
+  const getActionLabelForTimeline = (content: string): string => {
+    // Shorter labels for timeline view
+    const contentLower = content.toLowerCase();
+    if (contentLower.includes('analyzing') || contentLower.includes('analysis')) {
+      return 'analyzing';
+    } else if (contentLower.includes('researching') || contentLower.includes('research')) {
+      return 'researching';
+    } else if (contentLower.includes('code') || contentLower.includes('function')) {
+      return 'coding';
+    } else if (contentLower.includes('plan') || contentLower.includes('steps')) {
+      return 'planning';
+    } else if (contentLower.includes('thinking') || contentLower.includes('consider')) {
+      return 'thinking';
+    } else if (contentLower.includes('responding') || contentLower.includes('response')) {
+      return 'responding';
+    } else if (contentLower.includes('error') || contentLower.includes('failed')) {
+      return 'error';
+    } else if (contentLower.includes('completed') || contentLower.includes('finished')) {
+      return 'completed';
+    }
+    
+    return 'active';
+  };
+  
+  // Get action label based on message metadata
+  const getActionLabel = (message: Message): string => {
+    // Check if metadata exists and is an object
+    if (!message.metadata || typeof message.metadata !== 'object') {
+      return 'Response';
+    }
+    
+    const metadata = message.metadata as any;
+    
+    // Check for action type
+    if (metadata.action) {
+      return metadata.action;
+    }
+    
+    // Check for message type
+    if (metadata.type) {
+      switch (metadata.type) {
+        case 'thinking': return 'Thinking';
+        case 'response': return 'Response';
+        case 'error': return 'Error';
+        case 'suggestion': return 'Suggestion';
+        case 'question': return 'Question';
+        case 'analysis': return 'Analysis';
+        case 'summary': return 'Summary';
+        default: return metadata.type.charAt(0).toUpperCase() + metadata.type.slice(1);
+      }
+    }
+    
+    // Check content for specific patterns
+    const content = message.content.toLowerCase();
+    if (content.includes('analyzing') || content.includes('analysis')) {
+      return 'Analysis';
+    } else if (content.includes('researching') || content.includes('research')) {
+      return 'Research';
+    } else if (content.includes('code') || content.includes('function')) {
+      return 'Code Generation';
+    } else if (content.includes('plan') || content.includes('steps')) {
+      return 'Planning';
+    } else if (content.includes('thinking') || content.includes('consider')) {
+      return 'Thinking';
+    }
+    
+    return 'Response';
+  };
+  
   // If no user message or agent messages, don't render
   if (!userMessage && agentMessages.length === 0) {
     return null;
@@ -161,22 +270,30 @@ export default function MessageGroup({
   
   // Unified view
   const renderUnifiedView = () => (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-6">
       {agentMessages
         .filter(msg => !(typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking'))
         .map((message, index) => {
           const agent = getAgent?.(message.agentId || 0);
           return (
-            <div key={message.id || index} className="space-y-2">
+            <div key={message.id || index} className="space-y-3 border-l-4 pl-4" style={{ borderColor: getAgentColor(agent?.type) }}>
               {agent && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium">{agent.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {formatTime(message.createdAt)}
-                  </span>
+                <div className="flex items-center gap-2 bg-muted/40 p-2 rounded-t">
+                  <Avatar className="h-6 w-6 bg-primary/10">
+                    {getAgentIcon(agent.type)}
+                  </Avatar>
+                  <div>
+                    <span className="text-sm font-bold text-primary">{agent.name}</span>
+                    <span className="text-xs ml-2 text-muted-foreground">
+                      {formatTime(message.createdAt)}
+                    </span>
+                  </div>
+                  <div className="ml-2 text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                    {getActionLabel(message)}
+                  </div>
                 </div>
               )}
-              <div className="text-sm">
+              <div className="text-sm bg-card p-3 rounded shadow-sm">
                 <Markdown>{message.content}</Markdown>
               </div>
             </div>
@@ -214,16 +331,35 @@ export default function MessageGroup({
                 key={agent.id} 
                 className={`space-y-4 ${activeAgentId === agent.id ? 'block' : 'hidden'}`}
               >
+                {/* Agent header */}
+                <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg mb-4 border-l-4" style={{ borderColor: getAgentColor(agent.type) }}>
+                  <Avatar className="h-8 w-8 bg-primary/10">
+                    {getAgentIcon(agent.type)}
+                  </Avatar>
+                  <div>
+                    <div className="font-bold text-primary">{agent.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {agent.description || `${agent.type.charAt(0).toUpperCase() + agent.type.slice(1)} agent`}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Agent messages */}
                 {agentMessages
                   .filter(msg => msg.agentId === agent.id && !(typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking'))
                   .map((message, index) => (
-                    <div key={message.id || index} className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">
-                          {formatTime(message.createdAt)}
-                        </span>
+                    <div key={message.id || index} className="space-y-2 border-l-2 pl-3" style={{ borderColor: getAgentColor(agent.type) }}>
+                      <div className="flex items-center gap-2 bg-muted/30 p-2 rounded-t">
+                        <div className="flex items-center">
+                          <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground mr-2">
+                            {getActionLabel(message)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatTime(message.createdAt)}
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-sm">
+                      <div className="text-sm bg-card p-3 rounded shadow-sm">
                         <Markdown>{message.content}</Markdown>
                       </div>
                     </div>
@@ -233,9 +369,15 @@ export default function MessageGroup({
                 {agentMessages
                   .filter(msg => msg.agentId === agent.id && typeof msg.metadata === 'object' && msg.metadata && (msg.metadata as any)?.type === 'thinking')
                   .map((message, index) => (
-                    <div key={`thinking-${message.id || index}`} className="mt-4 p-3 bg-muted/50 rounded border text-sm">
+                    <div key={`thinking-${message.id || index}`} className="mt-4 p-3 bg-blue-50/30 dark:bg-blue-950/20 rounded border-l-2 border border-blue-200 dark:border-blue-900 text-sm">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-medium">Reasoning Process</span>
+                        <span className="text-xs font-medium flex items-center">
+                          <Brain className="h-3.5 w-3.5 mr-1 text-blue-500" />
+                          Reasoning Process
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatTime(message.createdAt)}
+                        </span>
                       </div>
                       <div className="text-xs text-muted-foreground">
                         <Markdown>{message.content}</Markdown>
@@ -263,34 +405,58 @@ export default function MessageGroup({
           const agent = getAgent?.(step.agentId);
           
           return (
-            <div key={step.id} className="relative pl-6 ml-3 pb-4 pt-1 border-l">
+            <div key={step.id} className="relative pl-6 ml-3 pb-4 pt-1 border-l" style={{ 
+              borderColor: agent?.type ? getAgentColor(agent.type) + '40' : undefined 
+            }}>
               {/* Timeline dot */}
               <div 
                 className={cn(
-                  "absolute left-[-4px] top-2 w-2 h-2 rounded-full",
-                  step.status === 'thinking' ? 'bg-blue-500' :
-                  step.status === 'completed' ? 'bg-green-500' :
-                  step.status === 'error' ? 'bg-red-500' :
-                  'bg-neutral-400'
+                  "absolute left-[-5px] top-2 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center",
+                  step.status === 'thinking' ? 'bg-blue-100 border-blue-500 dark:bg-blue-900' :
+                  step.status === 'completed' ? 'bg-green-100 border-green-500 dark:bg-green-900' :
+                  step.status === 'error' ? 'bg-red-100 border-red-500 dark:bg-red-900' :
+                  'bg-neutral-100 border-neutral-400 dark:bg-neutral-800'
                 )}
-              />
+              >
+                {agent?.type && (
+                  <div className="text-[8px]" style={{ color: getAgentColor(agent.type) }}>
+                    {step.status === 'thinking' ? (
+                      <Brain className="h-2 w-2" />
+                    ) : step.status === 'error' ? (
+                      <Clock className="h-2 w-2" />
+                    ) : (
+                      getAgentIconForTimeline(agent.type)
+                    )}
+                  </div>
+                )}
+              </div>
               
               {/* Step details */}
               <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-medium">
-                    {agent?.name || `Agent #${step.agentId}`}
-                  </span>
-                  <span className="text-muted-foreground text-xs">
+                <div className="flex items-center justify-between text-xs gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium" style={{ color: agent?.type ? getAgentColor(agent.type) : undefined }}>
+                      {agent?.name || `Agent #${step.agentId}`}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-muted text-muted-foreground">
+                      {step.status === 'thinking' ? 'thinking...' : 
+                       step.status === 'error' ? 'error' : 
+                       step.status === 'waiting' ? 'waiting' : getActionLabelForTimeline(step.content)}
+                    </span>
+                  </div>
+                  <span className="text-muted-foreground text-[10px]">
                     {formatTime(step.timestamp)}
                   </span>
                 </div>
                 <div className={cn(
-                  "text-xs p-2 rounded",
-                  step.status === 'thinking' ? 'bg-blue-50 dark:bg-blue-950/30' :
-                  step.status === 'completed' ? 'bg-neutral-50 dark:bg-neutral-900/30' :
-                  step.status === 'error' ? 'bg-red-50 dark:bg-red-950/30' :
-                  'bg-neutral-50 dark:bg-neutral-900/30'
+                  "text-xs p-2 rounded border-l-2 ml-1",
+                  step.status === 'thinking' 
+                    ? 'bg-blue-50/50 border-blue-300 dark:bg-blue-950/20 dark:border-blue-700' :
+                  step.status === 'completed' 
+                    ? 'bg-card border-neutral-200 dark:border-neutral-700' :
+                  step.status === 'error' 
+                    ? 'bg-red-50/50 border-red-300 dark:bg-red-950/20 dark:border-red-700' :
+                  'bg-neutral-50 border-neutral-200 dark:bg-neutral-900/30 dark:border-neutral-700'
                 )}>
                   <Markdown>{step.content}</Markdown>
                 </div>
