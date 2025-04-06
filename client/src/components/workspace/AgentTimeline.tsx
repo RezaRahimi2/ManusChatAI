@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight, Clock, AlertCircle, CheckCircle, StopCircle } from 'lucide-react';
 import { Agent, Message } from '@shared/schema';
+import { stopCollaboration } from '@/lib/socket';
+import { useToast } from '@/hooks/use-toast';
 
 interface AgentTimelineProps {
   activeAgents: {
@@ -14,6 +16,9 @@ interface AgentTimelineProps {
   agents?: Agent[];
   messages?: Message[];
   className?: string;
+  workspaceId?: number;
+  collaborationId?: string;
+  onStop?: () => void;
 }
 
 interface TimelineEvent {
@@ -31,14 +36,52 @@ export default function AgentTimeline({
   agents = [],
   messages = [],
   onShowDetails,
-  className
+  className,
+  workspaceId,
+  collaborationId,
+  onStop
 }: AgentTimelineProps) {
   const [expanded, setExpanded] = useState(false);
   const [events, setEvents] = useState<TimelineEvent[]>([]);
+  const { toast } = useToast();
   
   // Format time display
   const formatTime = (date: Date): string => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+  
+  // Handle stop collaboration button click
+  const handleStopCollaboration = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent the collapse/expand from triggering
+    
+    if (workspaceId && collaborationId) {
+      const success = stopCollaboration(workspaceId, collaborationId);
+      
+      if (success) {
+        toast({
+          title: "Stopping task",
+          description: "Sent request to stop the current task.",
+          variant: "default"
+        });
+        
+        // Call the onStop callback if provided
+        if (onStop) {
+          onStop();
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to send stop request. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } else {
+      toast({
+        title: "Error",
+        description: "No active task to stop.",
+        variant: "destructive"
+      });
+    }
   };
   
   // Extract timeline events from messages and agent statuses 
@@ -163,9 +206,25 @@ export default function AgentTimeline({
           <Clock className="h-4 w-4 opacity-70" />
           <h3 className="text-sm font-medium">Agent Activity Timeline</h3>
         </div>
-        <Button variant="ghost" size="icon" className="h-6 w-6">
-          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        </Button>
+        
+        <div className="flex items-center gap-2">
+          {/* Stop button - only show if we have an active collaboration and workspace */}
+          {workspaceId && collaborationId && activeAgents.some(a => a.status === 'processing') && (
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              className="h-7 text-xs flex items-center gap-1 mr-1"
+              onClick={handleStopCollaboration}
+            >
+              <StopCircle className="h-3 w-3" />
+              Stop Task
+            </Button>
+          )}
+          
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={e => e.stopPropagation()}>
+            {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </Button>
+        </div>
       </div>
       
       {expanded && (

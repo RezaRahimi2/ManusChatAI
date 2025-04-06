@@ -13,7 +13,8 @@ import {
 } from './protocols/collaborationProtocol';
 
 export class EnhancedOrchestrator extends BaseAgent {
-  private collaborationProtocol: CollaborationProtocol;
+  // Make protocol accessible to AgentManager for stop functionality
+  public collaborationProtocol: CollaborationProtocol;
   
   constructor(
     agentData: Agent,

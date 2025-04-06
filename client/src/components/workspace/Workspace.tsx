@@ -20,7 +20,7 @@ interface WorkspaceProps {
 export default function Workspace({ workspaceId }: WorkspaceProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { getAgentById, getAllAgents } = useAgentContext();
-  const { isConnected, lastError, sendChatMessage } = useSocket();
+  const { isConnected, lastError, sendChatMessage, stopCollaboration } = useSocket();
   const [thinking, setThinking] = useState(false);
   const [thinkingAgent, setThinkingAgent] = useState<Agent | undefined>(undefined);
   const [thinkingContent, setThinkingContent] = useState<string>('');
@@ -370,6 +370,25 @@ export default function Workspace({ workspaceId }: WorkspaceProps) {
   const closeTimelineDetail = () => {
     setShowTimelineDetail(false);
   };
+  
+  // Handle stop collaboration
+  const handleStopCollaboration = () => {
+    // Clear active agents and set their status to completed
+    const newActiveAgents = new Map(activeAgents);
+    Array.from(newActiveAgents.keys()).forEach(agentId => {
+      if (newActiveAgents.get(agentId) === AgentStatus.PROCESSING) {
+        newActiveAgents.set(agentId, AgentStatus.COMPLETED);
+      }
+    });
+    setActiveAgents(newActiveAgents);
+    
+    // Show toast notification to confirm stopping
+    toast({
+      title: 'Task Stopped',
+      description: 'The current task has been stopped.',
+      variant: 'default',
+    });
+  };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -397,6 +416,16 @@ export default function Workspace({ workspaceId }: WorkspaceProps) {
                 status
               }))}
             onShowDetails={showTimelineDetails}
+            workspaceId={workspaceId}
+            collaborationId={currentCollaboration}
+            onStop={() => {
+              if (currentCollaboration) {
+                // Stop the collaboration via socket
+                stopCollaboration(workspaceId, currentCollaboration);
+                // Update UI state
+                handleStopCollaboration();
+              }
+            }}
           />
           
           {/* Add interactive agent flow visualizer for active collaborations */}

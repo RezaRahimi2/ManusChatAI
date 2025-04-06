@@ -23,6 +23,40 @@ export function setupWebSocketHandlers(wss: WebSocketServer, agentManagerInstanc
             leaveWorkspace(ws, message.workspaceId);
             break;
             
+          case 'stop_collaboration':
+            // Stop running collaboration
+            if (message.workspaceId && message.collaborationId) {
+              console.log(`Stopping collaboration ${message.collaborationId} for workspace ${message.workspaceId}`);
+              
+              try {
+                // Stop the collaboration
+                const success = await agentManager.stopCollaboration(
+                  message.workspaceId,
+                  message.collaborationId
+                );
+                
+                console.log(`Stop collaboration request ${success ? 'succeeded' : 'failed'}`);
+                
+                // Send confirmation to client
+                ws.send(JSON.stringify({
+                  type: 'collaboration_stop_result',
+                  workspaceId: message.workspaceId,
+                  collaborationId: message.collaborationId,
+                  success,
+                  timestamp: Date.now()
+                }));
+              } catch (stopError) {
+                console.error('Error stopping collaboration:', stopError);
+                ws.send(JSON.stringify({
+                  type: 'error',
+                  workspaceId: message.workspaceId,
+                  error: 'Failed to stop collaboration: ' + (stopError instanceof Error ? stopError.message : 'Unknown error'),
+                  timestamp: Date.now()
+                }));
+              }
+            }
+            break;
+            
           case 'message':
             // Process new message
             if (message.workspaceId && message.message && message.message.content) {

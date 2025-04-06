@@ -15,9 +15,36 @@ import { toolManager } from '../tools/toolManager';
 class AgentManager {
   private agents: Map<number, BaseAgent> = new Map();
   private llmManager: LLMManager;
+  private currentCollaborations: Map<number, string> = new Map(); // workspaceId -> collaborationId
   
   constructor() {
     this.llmManager = new LLMManager();
+  }
+  
+  /**
+   * Stop an active collaboration in a workspace
+   */
+  async stopCollaboration(workspaceId: number, collaborationId: string): Promise<boolean> {
+    // Find the orchestrator agent for this workspace
+    let enhancedOrchestrator: EnhancedOrchestrator | undefined;
+    
+    // Convert to array to avoid downlevelIteration issues
+    Array.from(this.agents.values()).forEach(agent => {
+      if (agent.getType() === 'enhanced_orchestrator' && agent.getConfig().isActive) {
+        enhancedOrchestrator = agent as EnhancedOrchestrator;
+      }
+    });
+    
+    if (!enhancedOrchestrator || !enhancedOrchestrator.collaborationProtocol) {
+      console.error('No active orchestrator with collaboration protocol found');
+      return false;
+    }
+    
+    // Store the current collaboration ID for this workspace (for future reference)
+    this.currentCollaborations.set(workspaceId, collaborationId);
+    
+    // Stop the collaboration using the protocol
+    return enhancedOrchestrator.collaborationProtocol.stopCollaboration(collaborationId, workspaceId);
   }
   
   async initialize() {
@@ -286,17 +313,16 @@ class AgentManager {
       console.log(`Found ${agentInstances.length} agent instances`);
       
       // First find the enhanced orchestrator if available
-      for (const agent of agentInstances) {
-        if (agent.getType() === 'enhanced_orchestrator' && agent.getConfig().isActive) {
+      agentInstances.forEach(agent => {
+        if (!orchestrator && agent.getType() === 'enhanced_orchestrator' && agent.getConfig().isActive) {
           console.log(`Found active enhanced orchestrator: ${agent.getName()} (${agent.getId()})`);
           orchestrator = agent;
-          break;
-        } else if (agent.getType() === 'orchestrator' && agent.getConfig().isActive) {
+        } else if (!orchestrator && agent.getType() === 'orchestrator' && agent.getConfig().isActive) {
           // Keep as fallback
           console.log(`Found active basic orchestrator as fallback: ${agent.getName()} (${agent.getId()})`);
           fallbackOrchestrator = agent;
         }
-      }
+      });
       
       // If no enhanced orchestrator, use the fallback
       if (!orchestrator && fallbackOrchestrator) {
@@ -306,9 +332,9 @@ class AgentManager {
       
       if (!orchestrator) {
         console.error('Could not find any active orchestrator agents. Available agents:');
-        for (const agent of agentInstances) {
+        agentInstances.forEach(agent => {
           console.log(`- ${agent.getName()} (${agent.getId()}): type=${agent.getType()}, active=${agent.getConfig().isActive}`);
-        }
+        });
         throw new Error('No active orchestrator agent found. Please activate at least one orchestrator agent in the Agents section.');
       }
       

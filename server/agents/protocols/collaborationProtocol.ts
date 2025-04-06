@@ -58,9 +58,67 @@ export interface CollaborationStep {
 export class CollaborationProtocol {
   private llmManager: LLMManager;
   private collaborations: Map<string, Collaboration> = new Map();
+  private activeCollaborations: Set<string> = new Set(); // Track active collaborations for stopping
   
   constructor(llmManager: LLMManager) {
     this.llmManager = llmManager;
+  }
+  
+  /**
+   * Stop an active collaboration
+   */
+  async stopCollaboration(collaborationId: string, workspaceId: number): Promise<boolean> {
+    const collaboration = this.collaborations.get(collaborationId);
+    
+    if (!collaboration) {
+      console.log(`Collaboration ${collaborationId} not found to stop`);
+      return false;
+    }
+    
+    // Mark collaboration as stopped
+    collaboration.status = 'failed';
+    collaboration.updatedAt = Date.now();
+    this.collaborations.set(collaborationId, collaboration);
+    
+    // Mark all in-progress steps as failed
+    collaboration.steps.forEach(step => {
+      if (step.status === 'in_progress' || step.status === 'pending') {
+        step.status = 'failed';
+        step.metadata = {
+          ...step.metadata,
+          stoppedByUser: true
+        };
+      }
+    });
+    
+    // Remove from active collaborations
+    this.activeCollaborations.delete(collaborationId);
+    
+    // Broadcast cancellation
+    broadcastToWorkspace(workspaceId, {
+      type: 'collaboration_stopped',
+      workspaceId,
+      collaborationId
+    });
+    
+    // Add a system message indicating the collaboration was stopped by user
+    const stoppedMessage: Message = {
+      id: Date.now(),
+      workspaceId,
+      role: 'system',
+      content: `Collaboration stopped by user.`,
+      agentId: collaboration.initiatorAgentId,
+      metadata: {
+        collaborationId,
+        type: 'collaboration_stopped'
+      },
+      createdAt: Date.now()
+    };
+    
+    await storage.createMessage(stoppedMessage);
+    
+    console.log(`Collaboration ${collaborationId} stopped successfully`);
+    return true;
   }
   
   /**

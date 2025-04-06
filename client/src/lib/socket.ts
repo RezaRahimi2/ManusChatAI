@@ -52,6 +52,18 @@ export const sendChatMessage = (workspaceId: number, content: string): boolean =
   });
 };
 
+// Helper to stop an active collaboration in a workspace
+export const stopCollaboration = (workspaceId: number, collaborationId: string): boolean => {
+  console.log(`Stopping collaboration ${collaborationId} in workspace ${workspaceId}`);
+  
+  return sendSocketMessage({
+    type: 'stop_collaboration',
+    workspaceId,
+    collaborationId,
+    timestamp: Date.now()
+  });
+};
+
 // Register a listener for specific message types
 export const addMessageListener = (type: string, callback: (data: any) => void): void => {
   if (!messageListeners.has(type)) {
@@ -189,6 +201,7 @@ export const useSocket = () => {
     lastError,
     sendMessage: sendSocketMessage,
     joinWorkspace,
-    sendChatMessage
+    sendChatMessage,
+    stopCollaboration
   };
 };
