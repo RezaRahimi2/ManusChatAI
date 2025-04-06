@@ -1,4 +1,4 @@
-import { Agent, type Message } from '@shared/schema';
+import { Agent as DbAgent, type Message } from '@shared/schema';
 import { LLMManager } from '../llm/llmManager';
 import { MemoryManager } from '../memory/memory';
 import { ToolManager } from '../tools/toolManager';
@@ -13,13 +13,13 @@ interface LLMMessage {
 }
 
 export class BaseAgent {
-  protected agentData: Agent;
+  protected agentData: DbAgent;
   protected llmManager: LLMManager;
   protected memoryManager: MemoryManager;
   protected toolManager: ToolManager;
   
   constructor(
-    agentData: Agent,
+    agentData: DbAgent,
     llmManager: LLMManager,
     memoryManager: MemoryManager,
     toolManager: ToolManager
@@ -30,7 +30,7 @@ export class BaseAgent {
     this.toolManager = toolManager;
   }
   
-  getConfig(): Agent {
+  getConfig(): DbAgent {
     return this.agentData;
   }
   
