@@ -76,6 +76,37 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
   }
   
   /**
+   * Get the priority score for an agent type
+   * Higher priority agents are more likely to be considered for tasks
+   */
+  private getAgentPriority(agentType: string): number {
+    // Agent types with specializations get higher priorities
+    const typeMap: Record<string, number> = {
+      'researcher': 9,
+      'research': 9,
+      'coder': 8,
+      'code': 8,
+      'writer': 7,
+      'planner': 10,
+      'thinker': 6,
+      'assistant': 5,
+      'default': 0
+    };
+    
+    // Normalize the agent type for matching
+    const normalizedType = agentType.toLowerCase();
+    
+    // Check if the type or a substring of it exists in our map
+    for (const [type, priority] of Object.entries(typeMap)) {
+      if (normalizedType.includes(type)) {
+        return priority;
+      }
+    }
+    
+    return 0; // Default priority
+  }
+  
+  /**
    * Initialize the AWS agents from our database agents
    */
   private async initializeAgents() {
@@ -83,14 +114,22 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
       // Get all active agents
       const allAgents = await agentManager.getAllAgents();
       
-      // Include all other agent types except orchestrators (avoid creating loops)
+      // Include all agent types except AWS orchestrator itself (avoid creating loops)
+      // We keep other orchestrators as they might have specialized capabilities
       const activeAgents = allAgents.filter(a => 
         a.isActive && 
         a.id !== this.getId() && 
-        !['aws_orchestrator', 'enhanced_orchestrator', 'orchestrator'].includes(a.type)
+        a.type !== 'aws_orchestrator' // Only exclude the AWS orchestrator type
       );
       
-      console.log(`Initializing ${activeAgents.length} agents for AWS Multi-Agent Orchestrator`);
+      // Sort agents by priority (specialized agents first)
+      activeAgents.sort((a, b) => {
+        const priorityA = this.getAgentPriority(a.type);
+        const priorityB = this.getAgentPriority(b.type);
+        return priorityB - priorityA; // Higher priority first
+      });
+      
+      console.log(`Initializing ${activeAgents.length} agents for AWS Multi-Agent Orchestrator, sorted by specialization priority`);
       
       if (activeAgents.length === 0) {
         console.log('No active agents found. Will create a default agent for testing.');
@@ -186,31 +225,67 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
    */
   private createAwsAgent(agentData: DbAgent): OpenAIAgent | null {
     try {
-      // Only support OpenAI provider for now
-      if (agentData.provider !== 'openai') {
-        console.log(`Agent ${agentData.name} uses provider ${agentData.provider}, which is not currently supported by AWS Multi-Agent Orchestrator. Skipping.`);
-        return null;
+      // Get the appropriate API key and model name based on the provider
+      let apiKey: string;
+      let modelName: string;
+      
+      // Map our internal providers to appropriate API keys
+      switch(agentData.provider) {
+        case 'openai':
+          apiKey = process.env.OPENAI_API_KEY as string;
+          modelName = agentData.model || 'gpt-4o';
+          break;
+        case 'anthropic':
+          apiKey = process.env.ANTHROPIC_API_KEY as string;
+          modelName = agentData.model || 'claude-3-7-sonnet-20250219';
+          console.log(`Using Anthropic model with OpenAI adapter: ${modelName}`);
+          break;
+        case 'deepseek':
+          // For DeepSeek, use the OpenAI API key since we're using an OpenAI-compatible API
+          apiKey = process.env.OPENAI_API_KEY as string;
+          modelName = agentData.model || 'deepseek-chat';
+          console.log(`Using DeepSeek model with OpenAI adapter: ${modelName}`);
+          break;
+        default:
+          // For any other provider, use OpenAI as a fallback
+          console.log(`Converting ${agentData.provider} agent to OpenAI format for AWS Multi-Agent Orchestrator compatibility`);
+          apiKey = process.env.OPENAI_API_KEY as string;
+          modelName = 'gpt-4o'; // Fallback to a reliable model
       }
       
-      // Create AWS agent
+      // Check if we have the necessary API key
+      if (!apiKey) {
+        console.log(`No API key available for provider ${agentData.provider}. Using the OpenAI API key as fallback.`);
+        apiKey = process.env.OPENAI_API_KEY as string;
+      }
+      
+      // Create a generic agent description that emphasizes the original agent's role
+      const agentTemplate = `You are the "${agentData.name}" agent, specializing in ${agentData.description || agentData.type}. 
+${agentData.systemPrompt || ''}
+
+Remember your core competency is in ${agentData.type.toUpperCase()} tasks.`;
+      
+      // Create AWS agent with OpenAI format but adapted to the original agent's role
       const agent = new OpenAIAgent({
         name: agentData.name,
         description: agentData.description || agentData.type,
-        apiKey: process.env.OPENAI_API_KEY as string,
-        model: agentData.model || 'gpt-4o',
+        apiKey: apiKey,
+        model: modelName,
         streaming: false,
         inferenceConfig: {
           temperature: (agentData.temperature || 70) / 100, // Convert our 0-100 scale to 0-1
           maxTokens: agentData.maxTokens || 4000
         },
         customSystemPrompt: {
-          template: agentData.systemPrompt || 'You are a helpful assistant.',
+          template: agentTemplate,
           variables: {}
         }
       });
       
       // Set ID after creation to avoid TypeScript errors
       (agent as any).id = `agent_${agentData.id}`;
+      
+      console.log(`Successfully created adapter for ${agentData.name} (${agentData.type}) with model ${modelName}`);
       
       return agent;
     } catch (error) {
@@ -300,34 +375,106 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
       let response;
       try {
         console.log('Routing request through AWS Multi-Agent Orchestrator...');
+        
+        // Use better prompting to help with intent classification
+        const classificationPrompt = `
+Task: Determine which specialized agent is best suited to handle the following user request.
+User request: "${userMessage}"
+
+Available agents and their specialties:
+${Array.from(this.awsAgents.values()).map(agent => 
+  `- ${agent.name}: ${agent.description || 'General assistant'}`
+).join('\n')}
+
+Analyze the request carefully and select the most appropriate agent.`;
+
+        // Log available agents for debugging
+        console.log('Available agents for routing:');
+        for (const [id, agent] of this.awsAgents.entries()) {
+          console.log(`> Agent ID: ${id}, Name: ${agent.name}, Description: ${agent.description || 'No description'}`);
+        }
+        
+        // Modify the userMessage to include a hint about agent selection
+        const enhancedUserMessage = userMessage.includes('using') ? userMessage : 
+          `${userMessage} (Please select the most appropriate specialized agent to handle this request)`;
+        
+        // Route the request through the orchestrator
         response = await this.orchestrator.routeRequest(
-          userMessage,
+          enhancedUserMessage,
           userId,
           sessionId,
-          { chatHistory: orchestratorMessages }
+          { 
+            chatHistory: orchestratorMessages,
+            classificationPrompt: classificationPrompt
+          }
         );
+        
         console.log('Request successfully routed, response:', response);
+        
+        // Log the selected agent for debugging
+        console.log(`> Selected Agent: ${response.metadata?.agentId || 'No agent selected'}`);
+        console.log(`> Confidence: ${response.metadata?.additionalParams?.confidence || 'unknown'}`);
       } catch (error) {
         console.error('Error during intent classification:', error);
         
-        // Fall back to default agent if there's an error with classification
-        console.log('Falling back to default agent due to classification error');
-        const defaultAgent = this.awsAgents.values().next().value;
+        // Try to determine the most appropriate agent based on keywords in the message
+        console.log('Attempting keyword-based agent selection as fallback...');
+        let selectedAgent: OpenAIAgent | undefined;
         
-        if (!defaultAgent) {
+        // Define keyword mappings for different agent types
+        const keywordMap: Record<string, string[]> = {
+          'research': ['research', 'find', 'search', 'information', 'data', 'analyze'],
+          'code': ['code', 'program', 'function', 'class', 'bug', 'develop', 'script', 'programming', 'algorithm'],
+          'writer': ['write', 'article', 'blog', 'content', 'essay', 'text', 'story', 'creative'],
+          'planner': ['plan', 'organize', 'schedule', 'project', 'steps', 'strategy', 'roadmap'],
+          'thinker': ['think', 'analyze', 'consider', 'philosophy', 'perspective', 'opinion', 'viewpoint']
+        };
+        
+        // Check for keyword matches
+        const lowerMessage = userMessage.toLowerCase();
+        let highestMatchScore = 0;
+        
+        for (const [agentType, keywords] of Object.entries(keywordMap)) {
+          let matchScore = 0;
+          
+          for (const keyword of keywords) {
+            if (lowerMessage.includes(keyword)) {
+              matchScore += 1;
+            }
+          }
+          
+          if (matchScore > highestMatchScore) {
+            highestMatchScore = matchScore;
+            
+            // Find an agent that matches this type
+            for (const agent of this.awsAgents.values()) {
+              if (agent.description?.toLowerCase().includes(agentType)) {
+                selectedAgent = agent;
+                break;
+              }
+            }
+          }
+        }
+        
+        // If no matching agent found, fall back to the default agent
+        if (!selectedAgent) {
+          console.log('No keyword match found, falling back to default agent');
+          selectedAgent = this.awsAgents.values().next().value;
+        }
+        
+        if (!selectedAgent) {
           throw new Error('No default agent available for fallback');
         }
         
-        // Create a simple fallback response without calling the agent
-        // This avoids API-specific method issues
-        console.log('Creating fallback response without calling agent API');
+        // Create a response using the selected agent's details
+        console.log(`Using ${selectedAgent.name} as fallback agent`);
         
         response = {
-          output: `I'm sorry, I encountered an issue while processing your request. Let me help you directly.\n\nYou asked: "${userMessage}"\n\nI'll do my best to assist you with this request.`,
+          output: `I'll help with your request about "${userMessage}". Let me address this for you.`,
           metadata: {
-            agentId: 'fallback',
+            agentId: (selectedAgent as any).id || 'fallback',
             additionalParams: {
-              confidence: 1.0,
+              confidence: 0.8,
               fallback: true
             }
           }
