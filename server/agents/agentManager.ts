@@ -13,7 +13,6 @@ import { LLMManager } from '../llm/llmManager';
 import { memoryManager } from '../memory/memory';
 import { toolManager } from '../tools/toolManager';
 import { agnoClient } from '../agno/agnoClient';
-import { AwsMultiAgentOrchestrator } from '../orchestrator/multiAgentOrchestrator';
 
 class AgentManager {
   private agents: Map<number, BaseAgent> = new Map();
@@ -69,8 +68,62 @@ class AgentManager {
   }
   
   async createDefaultAgents() {
-    // First create all specialized agents, THEN create the orchestrator
-
+    // Create enhanced orchestrator
+    await this.createAgent({
+      name: 'Enhanced Orchestrator',
+      description: 'Advanced coordination agent with sophisticated collaboration protocols',
+      type: 'enhanced_orchestrator',
+      systemPrompt: 'You are the Enhanced Orchestrator, an advanced coordination agent that uses sophisticated collaboration protocols to orchestrate specialized agents. You can dynamically determine the optimal collaboration mode (sequential, parallel, debate, or critique) based on the task requirements, and coordinate agents to work together efficiently, sharing context and building on each other\'s outputs.',
+      model: 'gpt-3.5-turbo',
+      provider: 'openai',
+      temperature: 0.7,
+      maxTokens: 4000,
+      tools: ['web_browser'],
+      isActive: true
+    });
+    
+    // Create basic orchestrator (as a backup option)
+    await this.createAgent({
+      name: 'Basic Orchestrator',
+      description: 'Simple coordination agent',
+      type: 'orchestrator',
+      systemPrompt: 'You are the Orchestrator, a coordination agent responsible for delegating tasks to specialized agents. You analyze user requests, break them down into subtasks, and determine which agents should handle each part. After receiving responses from all agents, you synthesize their outputs into a coherent response for the user.',
+      model: 'deepseek-reasoner',
+      provider: 'deepseek',
+      temperature: 0.007,
+      maxTokens: 4000,
+      tools: ['web_browser'],
+      isActive: false
+    });
+    
+    // Create Agno-powered agent
+    await this.createAgent({
+      name: 'Agno Assistant',
+      description: 'Advanced assistant using the Agno framework for enhanced capabilities',
+      type: 'agno',
+      systemPrompt: 'You are an advanced assistant powered by the Agno framework. You have enhanced capabilities for memory retention, tool usage, and task completion. Your goal is to provide helpful, accurate, and relevant responses to user queries.',
+      model: 'gpt-4o',
+      provider: 'openai',
+      temperature: 70,
+      maxTokens: 4000,
+      tools: ['web_browser', 'code_execution', 'deep_research'],
+      isActive: true
+    });
+    
+    // Create planner agent based on Genspark approach
+    await this.createAgent({
+      name: 'Planner Agent',
+      description: 'Creates detailed step-by-step plans for complex tasks, based on Genspark\'s plan-and-execute approach',
+      type: 'planner',
+      systemPrompt: 'You are a highly sophisticated Planning Agent specialized in breaking down complex tasks into clear, executable steps. When presented with a goal or task, your primary responsibility is to analyze the task, decompose it into logical steps, ensure steps are clear and actionable, consider dependencies, include necessary tools or resources, anticipate challenges, and structure the plan with clear organization. Format your plans with detailed numbering, specific actions, and tool recommendations for each step.',
+      model: 'gpt-3.5-turbo',
+      provider: 'openai',
+      temperature: 0.7,
+      maxTokens: 4000,
+      tools: ['plan_execution', 'deep_research', 'web_browser'],
+      isActive: true
+    });
+    
     // Create research agent
     await this.createAgent({
       name: 'Research Agent',
@@ -126,104 +179,6 @@ class AgentManager {
       tools: ['deep_research'],
       isActive: true
     });
-    
-    // Create planner agent based on Genspark approach
-    await this.createAgent({
-      name: 'Planner Agent',
-      description: 'Creates detailed step-by-step plans for complex tasks, based on Genspark\'s plan-and-execute approach',
-      type: 'planner',
-      systemPrompt: 'You are a highly sophisticated Planning Agent specialized in breaking down complex tasks into clear, executable steps. When presented with a goal or task, your primary responsibility is to analyze the task, decompose it into logical steps, ensure steps are clear and actionable, consider dependencies, include necessary tools or resources, anticipate challenges, and structure the plan with clear organization. Format your plans with detailed numbering, specific actions, and tool recommendations for each step.',
-      model: 'gpt-3.5-turbo',
-      provider: 'openai',
-      temperature: 0.7,
-      maxTokens: 4000,
-      tools: ['plan_execution', 'deep_research', 'web_browser'],
-      isActive: true
-    });
-    
-    // Create Agno-powered agent
-    await this.createAgent({
-      name: 'Agno Assistant',
-      description: 'Advanced assistant using the Agno framework for enhanced capabilities',
-      type: 'agno',
-      systemPrompt: 'You are an advanced assistant powered by the Agno framework. You have enhanced capabilities for memory retention, tool usage, and task completion. Your goal is to provide helpful, accurate, and relevant responses to user queries.',
-      model: 'gpt-4o',
-      provider: 'openai',
-      temperature: 70,
-      maxTokens: 4000,
-      tools: ['web_browser', 'code_execution', 'deep_research'],
-      isActive: true
-    });
-    
-    // AFTER all specialized agents, create AWS Multi-Agent Orchestrator
-    await this.createAgent({
-      name: 'AWS Multi-Agent Orchestrator',
-      description: 'Intelligent orchestration using the AWS Labs multi-agent-orchestrator framework',
-      type: 'aws_orchestrator',
-      systemPrompt: 'You are the AWS Multi-Agent Orchestrator, powered by AWS Labs\' multi-agent-orchestrator framework. You can intelligently classify user requests, route them to the appropriate specialized agent, and manage stateful conversations. Your advanced agent selection and context management ensures optimal handling of all requests.',
-      model: 'gpt-4o',
-      provider: 'openai',
-      temperature: 70,  // Use a more standard temperature value (0.7 after division by 100)
-      maxTokens: 4000,
-      tools: ['web_browser'],
-      isActive: true
-    });
-    
-    // Create enhanced orchestrator (as a first fallback option)
-    await this.createAgent({
-      name: 'Enhanced Orchestrator',
-      description: 'Advanced coordination agent with sophisticated collaboration protocols',
-      type: 'enhanced_orchestrator',
-      systemPrompt: 'You are the Enhanced Orchestrator, an advanced coordination agent that uses sophisticated collaboration protocols to orchestrate specialized agents. You can dynamically determine the optimal collaboration mode (sequential, parallel, debate, or critique) based on the task requirements, and coordinate agents to work together efficiently, sharing context and building on each other\'s outputs.',
-      model: 'gpt-3.5-turbo',
-      provider: 'openai',
-      temperature: 70,
-      maxTokens: 4000,
-      tools: ['web_browser'],
-      isActive: false
-    });
-    
-    // Create basic orchestrator (as a last resort backup option)
-    await this.createAgent({
-      name: 'Basic Orchestrator',
-      description: 'Simple coordination agent',
-      type: 'orchestrator',
-      systemPrompt: 'You are the Orchestrator, a coordination agent responsible for delegating tasks to specialized agents. You analyze user requests, break them down into subtasks, and determine which agents should handle each part. After receiving responses from all agents, you synthesize their outputs into a coherent response for the user.',
-      model: 'deepseek-reasoner',
-      provider: 'deepseek',
-      temperature: 0.007,
-      maxTokens: 4000,
-      tools: ['web_browser'],
-      isActive: false
-    });
-    
-    // Create enhanced orchestrator (as a first fallback option)
-    await this.createAgent({
-      name: 'Enhanced Orchestrator',
-      description: 'Advanced coordination agent with sophisticated collaboration protocols',
-      type: 'enhanced_orchestrator',
-      systemPrompt: 'You are the Enhanced Orchestrator, an advanced coordination agent that uses sophisticated collaboration protocols to orchestrate specialized agents. You can dynamically determine the optimal collaboration mode (sequential, parallel, debate, or critique) based on the task requirements, and coordinate agents to work together efficiently, sharing context and building on each other\'s outputs.',
-      model: 'gpt-3.5-turbo',
-      provider: 'openai',
-      temperature: 70,
-      maxTokens: 4000,
-      tools: ['web_browser'],
-      isActive: false
-    });
-    
-    // Create basic orchestrator (as a last resort backup option)
-    await this.createAgent({
-      name: 'Basic Orchestrator',
-      description: 'Simple coordination agent',
-      type: 'orchestrator',
-      systemPrompt: 'You are the Orchestrator, a coordination agent responsible for delegating tasks to specialized agents. You analyze user requests, break them down into subtasks, and determine which agents should handle each part. After receiving responses from all agents, you synthesize their outputs into a coherent response for the user.',
-      model: 'deepseek-reasoner',
-      provider: 'deepseek',
-      temperature: 0.007,
-      maxTokens: 4000,
-      tools: ['web_browser'],
-      isActive: false
-    });
   }
   
   private createAgentInstance(agentData: Agent): BaseAgent {
@@ -233,14 +188,6 @@ class AgentManager {
     switch (agentData.type) {
       case 'enhanced_orchestrator':
         agent = new EnhancedOrchestrator(
-          agentData,
-          this.llmManager,
-          memoryManager,
-          toolManager
-        );
-        break;
-      case 'aws_orchestrator':
-        agent = new AwsMultiAgentOrchestrator(
           agentData,
           this.llmManager,
           memoryManager,
@@ -389,12 +336,9 @@ class AgentManager {
       const agentInstances = Array.from(this.agents.values());
       console.log(`Found ${agentInstances.length} agent instances`);
       
-      // First find the enhanced orchestrator or AWS orchestrator if available
+      // First find the enhanced orchestrator if available
       agentInstances.forEach(agent => {
-        if (!orchestrator && agent.getType() === 'aws_orchestrator' && agent.getConfig().isActive) {
-          console.log(`Found active AWS Multi-Agent Orchestrator: ${agent.getName()} (${agent.getId()})`);
-          orchestrator = agent;
-        } else if (!orchestrator && agent.getType() === 'enhanced_orchestrator' && agent.getConfig().isActive) {
+        if (!orchestrator && agent.getType() === 'enhanced_orchestrator' && agent.getConfig().isActive) {
           console.log(`Found active enhanced orchestrator: ${agent.getName()} (${agent.getId()})`);
           orchestrator = agent;
         } else if (!orchestrator && agent.getType() === 'orchestrator' && agent.getConfig().isActive) {
