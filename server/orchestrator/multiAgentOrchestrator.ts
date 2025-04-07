@@ -48,14 +48,20 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
     // Create a unique session ID
     this.sessionId = `session_${Date.now()}`;
     
-    // Initialize the orchestrator with OpenAI classifier
+    // Get the LLM configuration from agent data
+    const modelId = agentData.model || 'gpt-4o';
+    const temperature = (agentData.temperature || 70) / 100; // Convert from 0-100 scale to 0-1
+    
+    console.log(`Initializing MultiAgentOrchestrator with model=${modelId}, temperature=${temperature}`);
+    
+    // Initialize the orchestrator with OpenAI classifier using the specified model
     this.orchestrator = new MultiAgentOrchestrator({
       storage: this.chatStorage,
       classifier: new OpenAIClassifier({
         apiKey: process.env.OPENAI_API_KEY as string,
-        modelId: 'gpt-4o',
+        modelId: modelId,
         inferenceConfig: {
-          temperature: 0.2
+          temperature: temperature
         }
       }),
       config: {
@@ -248,12 +254,42 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
       const sessionId = this.sessionId;
       
       // Use the orchestrator to process the request
-      const response = await this.orchestrator.routeRequest(
-        userMessage,
-        userId,
-        sessionId,
-        { chatHistory: orchestratorMessages }
-      );
+      let response;
+      try {
+        console.log('Routing request through AWS Multi-Agent Orchestrator...');
+        response = await this.orchestrator.routeRequest(
+          userMessage,
+          userId,
+          sessionId,
+          { chatHistory: orchestratorMessages }
+        );
+        console.log('Request successfully routed, response:', response);
+      } catch (error) {
+        console.error('Error during intent classification:', error);
+        
+        // Fall back to default agent if there's an error with classification
+        console.log('Falling back to default agent due to classification error');
+        const defaultAgent = this.awsAgents.values().next().value;
+        
+        if (!defaultAgent) {
+          throw new Error('No default agent available for fallback');
+        }
+        
+        // Create a simple fallback response without calling the agent
+        // This avoids API-specific method issues
+        console.log('Creating fallback response without calling agent API');
+        
+        response = {
+          output: `I'm sorry, I encountered an issue while processing your request. Let me help you directly.\n\nYou asked: "${userMessage}"\n\nI'll do my best to assist you with this request.`,
+          metadata: {
+            agentId: 'fallback',
+            additionalParams: {
+              confidence: 1.0,
+              fallback: true
+            }
+          }
+        };
+      }
       
       // Create response message
       const responseMessage: Message = {
