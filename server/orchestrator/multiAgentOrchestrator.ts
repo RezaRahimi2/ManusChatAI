@@ -31,6 +31,26 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
   private chatStorage: InMemoryChatStorage;
   private sessionId: string;
   
+  /**
+   * Convert map to array safely for TypeScript compatibility
+   */
+  private getAgentsArray(): OpenAIAgent[] {
+    // This manually converts the map values to an array to avoid TypeScript iteration issues
+    const result: OpenAIAgent[] = [];
+    this.awsAgents.forEach(agent => result.push(agent));
+    return result;
+  }
+
+  /**
+   * Convert map entries to array safely for TypeScript compatibility
+   */
+  private getAgentEntriesArray(): [number, OpenAIAgent][] {
+    // This manually converts the map entries to an array to avoid TypeScript iteration issues
+    const result: [number, OpenAIAgent][] = [];
+    this.awsAgents.forEach((agent, id) => result.push([id, agent]));
+    return result;
+  }
+  
   constructor(
     agentData: DbAgent,
     llmManager: LLMManager,
@@ -111,12 +131,17 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
    */
   private async initializeAgents() {
     try {
-      // Get all active agents
-      const allAgents = await agentManager.getAllAgents();
+      // Get access to all agent instances directly from the agent manager
+      // This is the best way to ensure we have all active agents
+      const agentInstances = Array.from((agentManager as any).agents.values());
+      
+      // Get all database agents for reference
+      const allDatabaseAgents = await agentManager.getAllAgents();
+      
+      console.log(`Found ${agentInstances.length} agent instances and ${allDatabaseAgents.length} database records`);
       
       // Include all agent types except AWS orchestrator itself (avoid creating loops)
-      // We keep other orchestrators as they might have specialized capabilities
-      const activeAgents = allAgents.filter(a => 
+      const activeAgents = allDatabaseAgents.filter(a => 
         a.isActive && 
         a.id !== this.getId() && 
         a.type !== 'aws_orchestrator' // Only exclude the AWS orchestrator type
@@ -129,7 +154,7 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
         return priorityB - priorityA; // Higher priority first
       });
       
-      console.log(`Initializing ${activeAgents.length} agents for AWS Multi-Agent Orchestrator, sorted by specialization priority`);
+      console.log(`Initializing ${activeAgents.length} active agents for AWS Multi-Agent Orchestrator, sorted by specialization priority`);
       
       if (activeAgents.length === 0) {
         console.log('No active agents found. Will create a default agent for testing.');
@@ -208,7 +233,8 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
       
       // Register default agent (use the first agent as default)
       if (this.awsAgents.size > 0) {
-        const defaultAgent = this.awsAgents.values().next().value;
+        const agents = this.getAgentsArray();
+        const defaultAgent = agents.length > 0 ? agents[0] : undefined;
         if (defaultAgent) {
           this.orchestrator.setDefaultAgent(defaultAgent as any);
           console.log(`Set default agent to ${defaultAgent.name}`);
@@ -382,17 +408,20 @@ Task: Determine which specialized agent is best suited to handle the following u
 User request: "${userMessage}"
 
 Available agents and their specialties:
-${Array.from(this.awsAgents.values()).map(agent => 
-  `- ${agent.name}: ${agent.description || 'General assistant'}`
-).join('\n')}
+${(() => {
+  const agents = this.getAgentsArray();
+  return agents.map(agent => 
+    `- ${agent.name}: ${agent.description || 'General assistant'}`
+  ).join('\n');
+})()}
 
 Analyze the request carefully and select the most appropriate agent.`;
 
         // Log available agents for debugging
         console.log('Available agents for routing:');
-        for (const [id, agent] of this.awsAgents.entries()) {
+        this.getAgentEntriesArray().forEach(([id, agent]) => {
           console.log(`> Agent ID: ${id}, Name: ${agent.name}, Description: ${agent.description || 'No description'}`);
-        }
+        });
         
         // Modify the userMessage to include a hint about agent selection
         const enhancedUserMessage = userMessage.includes('using') ? userMessage : 
@@ -447,7 +476,9 @@ Analyze the request carefully and select the most appropriate agent.`;
             highestMatchScore = matchScore;
             
             // Find an agent that matches this type
-            for (const agent of this.awsAgents.values()) {
+            const agents = this.getAgentsArray();
+            for (let i = 0; i < agents.length; i++) {
+              const agent = agents[i];
               if (agent.description?.toLowerCase().includes(agentType)) {
                 selectedAgent = agent;
                 break;
@@ -459,11 +490,12 @@ Analyze the request carefully and select the most appropriate agent.`;
         // If no matching agent found, fall back to the default agent
         if (!selectedAgent) {
           console.log('No keyword match found, falling back to default agent');
-          selectedAgent = this.awsAgents.values().next().value;
+          const agents = this.getAgentsArray();
+          selectedAgent = agents.length > 0 ? agents[0] : undefined;
         }
         
         if (!selectedAgent) {
-          throw new Error('No default agent available for fallback');
+          throw new Error('No agents available for collaboration. Please create at least one active agent first.');
         }
         
         // Create a response using the selected agent's details
