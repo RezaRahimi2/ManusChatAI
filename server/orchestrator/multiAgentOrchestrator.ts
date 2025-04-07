@@ -74,6 +74,12 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
     
     console.log(`Initializing MultiAgentOrchestrator with model=${modelId}, temperature=${temperature}`);
     
+    // Check if OpenAI API key is available, as it's required by the orchestrator
+    if (!process.env.OPENAI_API_KEY) {
+      console.error("ERROR: OPENAI_API_KEY is required for AWS Multi-Agent Orchestrator");
+      throw new Error("OPENAI_API_KEY is required for AWS Multi-Agent Orchestrator. Please provide it in your environment variables.");
+    }
+
     // Initialize the orchestrator with OpenAI classifier using the specified model
     this.orchestrator = new MultiAgentOrchestrator({
       storage: this.chatStorage,
@@ -91,8 +97,13 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
       }
     });
     
-    // Register all agents during initialization
-    this.initializeAgents();
+    // Register all agents during initialization after a short delay
+    // This ensures the agent manager has time to initialize all agents first
+    setTimeout(() => {
+      this.initializeAgents().catch(err => {
+        console.error("Error initializing AWS agents:", err);
+      });
+    }, 300);
   }
   
   /**
@@ -131,6 +142,9 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
    */
   private async initializeAgents() {
     try {
+      // Wait a moment for agent manager to initialize all agents
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Get access to all agent instances directly from the agent manager
       // This is the best way to ensure we have all active agents
       const agentInstances = Array.from((agentManager as any).agents.values());
@@ -139,6 +153,14 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
       const allDatabaseAgents = await agentManager.getAllAgents();
       
       console.log(`Found ${agentInstances.length} agent instances and ${allDatabaseAgents.length} database records`);
+      
+      // If we have a serious mismatch, wait a bit longer to let agents initialize
+      if (agentInstances.length < 3 && allDatabaseAgents.length > 5) {
+        console.log('Agent instances still initializing, waiting 500ms more...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const updatedAgentInstances = Array.from((agentManager as any).agents.values());
+        console.log(`After waiting, found ${updatedAgentInstances.length} agent instances`);
+      }
       
       // Include all agent types except AWS orchestrator itself (avoid creating loops)
       const activeAgents = allDatabaseAgents.filter(a => 
@@ -157,7 +179,7 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
       console.log(`Initializing ${activeAgents.length} active agents for AWS Multi-Agent Orchestrator, sorted by specialization priority`);
       
       if (activeAgents.length === 0) {
-        console.log('No active agents found. Will create a default agent for testing.');
+        console.warn('No active agents found. Will create a default agent for testing. This means specialized agents are unavailable.');
         
         // Create a basic default agent if none are found
         const defaultAwsAgent = new OpenAIAgent({
