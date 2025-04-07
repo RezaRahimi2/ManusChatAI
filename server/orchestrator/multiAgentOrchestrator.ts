@@ -112,8 +112,27 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
           }
         });
         
+        // Set ID after creation to avoid TypeScript errors
+        (defaultAwsAgent as any).id = 'default_assistant';
+        
+        // Register agent both in our map and in the orchestrator's registry
         this.awsAgents.set(999, defaultAwsAgent);
+        
+        // Make sure the agents object exists
+        if (!(this.orchestrator as any).agents) {
+          (this.orchestrator as any).agents = {};
+        }
+        
+        // Register the agent with its ID
         (this.orchestrator as any).agents[defaultAwsAgent.id] = defaultAwsAgent;
+        
+        // Also add the agent to the unknown agents registry to handle the specific error
+        if (!(this.orchestrator as any).classifier.agents) {
+          (this.orchestrator as any).classifier.agents = {};
+        }
+        (this.orchestrator as any).classifier.agents[defaultAwsAgent.id] = defaultAwsAgent;
+        
+        // Set as default agent
         this.orchestrator.setDefaultAgent(defaultAwsAgent as any);
         console.log('Registered default assistant agent with AWS orchestrator');
       }
@@ -122,9 +141,28 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
       for (const agentData of activeAgents) {
         const awsAgent = this.createAwsAgent(agentData);
         if (awsAgent) {
+          // Use string ID to avoid issues
+          const agentId = `agent_${agentData.id}`;
+          
           this.awsAgents.set(agentData.id, awsAgent);
-          // Register by adding to the agents object
-          (this.orchestrator as any).agents[awsAgent.id] = awsAgent;
+          
+          // Make sure the agents object exists
+          if (!(this.orchestrator as any).agents) {
+            (this.orchestrator as any).agents = {};
+          }
+          
+          // Register the agent with both the orchestrator and classifier
+          (this.orchestrator as any).agents[agentId] = awsAgent;
+          
+          // Also add to classifier agents registry
+          if ((this.orchestrator as any).classifier && !(this.orchestrator as any).classifier.agents) {
+            (this.orchestrator as any).classifier.agents = {};
+          }
+          
+          if ((this.orchestrator as any).classifier) {
+            (this.orchestrator as any).classifier.agents[agentId] = awsAgent;
+          }
+          
           console.log(`Registered agent ${agentData.name} (${agentData.id}) with AWS orchestrator`);
         }
       }
@@ -155,7 +193,7 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
       }
       
       // Create AWS agent
-      return new OpenAIAgent({
+      const agent = new OpenAIAgent({
         name: agentData.name,
         description: agentData.description || agentData.type,
         apiKey: process.env.OPENAI_API_KEY as string,
@@ -170,6 +208,11 @@ export class AwsMultiAgentOrchestrator extends BaseAgent {
           variables: {}
         }
       });
+      
+      // Set ID after creation to avoid TypeScript errors
+      (agent as any).id = `agent_${agentData.id}`;
+      
+      return agent;
     } catch (error) {
       console.error(`Error creating AWS agent for ${agentData.name}:`, error);
       return null;
