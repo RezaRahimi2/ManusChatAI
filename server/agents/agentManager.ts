@@ -13,6 +13,7 @@ import { LLMManager } from '../llm/llmManager';
 import { memoryManager } from '../memory/memory';
 import { toolManager } from '../tools/toolManager';
 import { agnoClient } from '../agno/agnoClient';
+import { AwsMultiAgentOrchestrator } from '../orchestrator/multiAgentOrchestrator';
 
 class AgentManager {
   private agents: Map<number, BaseAgent> = new Map();
@@ -68,7 +69,21 @@ class AgentManager {
   }
   
   async createDefaultAgents() {
-    // Create enhanced orchestrator
+    // Create AWS Multi-Agent Orchestrator
+    await this.createAgent({
+      name: 'AWS Multi-Agent Orchestrator',
+      description: 'Intelligent orchestration using the AWS Labs multi-agent-orchestrator framework',
+      type: 'aws_orchestrator',
+      systemPrompt: 'You are the AWS Multi-Agent Orchestrator, powered by AWS Labs\' multi-agent-orchestrator framework. You can intelligently classify user requests, route them to the appropriate specialized agent, and manage stateful conversations. Your advanced agent selection and context management ensures optimal handling of all requests.',
+      model: 'gpt-4o',
+      provider: 'openai',
+      temperature: 70,  // Use a more standard temperature value (0.7 after division by 100)
+      maxTokens: 4000,
+      tools: ['web_browser'],
+      isActive: true
+    });
+    
+    // Create enhanced orchestrator (as a first fallback option)
     await this.createAgent({
       name: 'Enhanced Orchestrator',
       description: 'Advanced coordination agent with sophisticated collaboration protocols',
@@ -76,13 +91,13 @@ class AgentManager {
       systemPrompt: 'You are the Enhanced Orchestrator, an advanced coordination agent that uses sophisticated collaboration protocols to orchestrate specialized agents. You can dynamically determine the optimal collaboration mode (sequential, parallel, debate, or critique) based on the task requirements, and coordinate agents to work together efficiently, sharing context and building on each other\'s outputs.',
       model: 'gpt-3.5-turbo',
       provider: 'openai',
-      temperature: 0.7,
+      temperature: 70,
       maxTokens: 4000,
       tools: ['web_browser'],
-      isActive: true
+      isActive: false
     });
     
-    // Create basic orchestrator (as a backup option)
+    // Create basic orchestrator (as a last resort backup option)
     await this.createAgent({
       name: 'Basic Orchestrator',
       description: 'Simple coordination agent',
@@ -188,6 +203,14 @@ class AgentManager {
     switch (agentData.type) {
       case 'enhanced_orchestrator':
         agent = new EnhancedOrchestrator(
+          agentData,
+          this.llmManager,
+          memoryManager,
+          toolManager
+        );
+        break;
+      case 'aws_orchestrator':
+        agent = new AwsMultiAgentOrchestrator(
           agentData,
           this.llmManager,
           memoryManager,
@@ -336,9 +359,12 @@ class AgentManager {
       const agentInstances = Array.from(this.agents.values());
       console.log(`Found ${agentInstances.length} agent instances`);
       
-      // First find the enhanced orchestrator if available
+      // First find the enhanced orchestrator or AWS orchestrator if available
       agentInstances.forEach(agent => {
-        if (!orchestrator && agent.getType() === 'enhanced_orchestrator' && agent.getConfig().isActive) {
+        if (!orchestrator && agent.getType() === 'aws_orchestrator' && agent.getConfig().isActive) {
+          console.log(`Found active AWS Multi-Agent Orchestrator: ${agent.getName()} (${agent.getId()})`);
+          orchestrator = agent;
+        } else if (!orchestrator && agent.getType() === 'enhanced_orchestrator' && agent.getConfig().isActive) {
           console.log(`Found active enhanced orchestrator: ${agent.getName()} (${agent.getId()})`);
           orchestrator = agent;
         } else if (!orchestrator && agent.getType() === 'orchestrator' && agent.getConfig().isActive) {
