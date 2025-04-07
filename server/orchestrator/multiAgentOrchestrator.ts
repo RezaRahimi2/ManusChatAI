@@ -424,9 +424,10 @@ Remember your core competency is in ${agentData.type.toUpperCase()} tasks.`;
       try {
         console.log('Routing request through AWS Multi-Agent Orchestrator...');
         
-        // Use better prompting to help with intent classification
+        // Use better prompting to help with intent classification, with clearer instructions
         const classificationPrompt = `
-Task: Determine which specialized agent is best suited to handle the following user request.
+IMPORTANT: You must select one of the agents listed below and only agents listed below.
+Task: Determine which specialized agent from the following list is best suited to handle the user request.
 User request: "${userMessage}"
 
 Available agents and their specialties:
@@ -437,7 +438,7 @@ ${(() => {
   ).join('\n');
 })()}
 
-Analyze the request carefully and select the most appropriate agent.`;
+RESPONSE INSTRUCTION: Select exactly one agent from the list above. Do not invent or suggest agents that are not in the list. If none perfectly match, select the closest one. For requests about coding, game development, or programming, select the Code Agent. For requests about research or information, select the Research Agent.`;
 
         // Log available agents for debugging
         console.log('Available agents for routing:');
@@ -475,7 +476,7 @@ Analyze the request carefully and select the most appropriate agent.`;
         // Define keyword mappings for different agent types
         const keywordMap: Record<string, string[]> = {
           'research': ['research', 'find', 'search', 'information', 'data', 'analyze'],
-          'code': ['code', 'program', 'function', 'class', 'bug', 'develop', 'script', 'programming', 'algorithm'],
+          'code': ['code', 'program', 'function', 'class', 'bug', 'develop', 'script', 'programming', 'algorithm', 'game', 'unity', 'developer', 'software', 'app', 'application', 'development', 'gaming'],
           'writer': ['write', 'article', 'blog', 'content', 'essay', 'text', 'story', 'creative'],
           'planner': ['plan', 'organize', 'schedule', 'project', 'steps', 'strategy', 'roadmap'],
           'thinker': ['think', 'analyze', 'consider', 'philosophy', 'perspective', 'opinion', 'viewpoint']
@@ -535,15 +536,52 @@ Analyze the request carefully and select the most appropriate agent.`;
         };
       }
       
-      // Create response message
+      // Process response content to ensure it doesn't refer to non-existent agents
+      let processedResponse = typeof response.output === 'string' ? response.output : await this.handleStreamingResponse(response.output);
+      
+      // Remove references to agents that don't exist in our system
+      const nonExistingAgents = ['Developer Agent', 'Unity Agent', 'Game Developer Agent'];
+      for (const agent of nonExistingAgents) {
+        if (processedResponse.includes(agent)) {
+          // Get the name of the Code Agent since it's the most relevant for these types of requests
+          const codeAgent = this.getAgentsArray().find(a => a.description?.toLowerCase().includes('code'));
+          const agentName = codeAgent ? codeAgent.name : "Code Agent";
+          
+          // Replace the non-existent agent with our actual Code Agent
+          processedResponse = processedResponse.replace(new RegExp(agent, 'g'), agentName);
+          
+          // Also fix any suggestions to connect with non-existent agents
+          processedResponse = processedResponse.replace(/Would you like me to connect you with/g, "I'll have");
+          processedResponse = processedResponse.replace(/for assistance with/g, "help you with");
+        }
+      }
+      
+      // For game development questions, force using the Code Agent if not explicitly chosen
+      const isGameDevelopment = userMessage.toLowerCase().includes('game') || 
+                               userMessage.toLowerCase().includes('unity');
+      
+      const selectedAgentId = response.metadata.agentId;
+      let actualAgent = selectedAgentId;
+      
+      // If it's a game development question but the agent doesn't exist or isn't one of our agents
+      if (isGameDevelopment && (!selectedAgentId || !selectedAgentId.includes('agent_'))) {
+        // Find the Code Agent
+        const codeAgent = this.getAgentsArray().find(a => a.description?.toLowerCase().includes('code'));
+        if (codeAgent) {
+          actualAgent = `agent_${codeAgent.id}`;
+          console.log(`Game development question detected, forcing Code Agent instead of ${selectedAgentId}`);
+        }
+      }
+      
+      // Create response message with the processed content
       const responseMessage: Message = {
         id: Date.now(),
         workspaceId,
         role: 'assistant',
-        content: typeof response.output === 'string' ? response.output : await this.handleStreamingResponse(response.output),
+        content: processedResponse,
         agentId: this.getId(),
         metadata: {
-          selectedAgent: response.metadata.agentId,
+          selectedAgent: actualAgent,
           confidence: response.metadata.additionalParams?.confidence
         },
         createdAt: Date.now()
